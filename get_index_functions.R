@@ -1,20 +1,21 @@
-library(tidyverse)
-library(readxl)
-library(httr)
-library(tidyquant)
-require(R.utils)
-library(openxlsx)
-library(stringr)
-library(RSelenium)
+# library(tidyverse)
+# library(readxl)
+# library(httr)
+# library(tidyquant)
+# require(R.utils)
+# library(openxlsx)
+# library(stringr)
+# library(RSelenium)
 
-get_index <- function(index, source) {
-  if (source == "msci") get_msci(index)
-  else if (source == "spind") get_spind(index)
-  else if (source == "bnp") get_bnp(index)
-  else if (source == "ftse") get_ftse(index)
-  else if (source == "six") get_six(index)
-  else if (source == "vienna") get_vienna(index)
-  else if (source == "yahoo") get_yahoo(index) 
+get_index <- function(index, source, name = index) {
+  if (source == "MSCI") get_msci(index, name)
+  else if (source == "SPind") get_spind(index, name)
+  else if (source == "BNP") get_bnp(index, name)
+  else if (source == "FTSE") get_ftse(index, name)
+  else if (source == "SIX") get_six(index, name)
+  else if (source == "Vienna") get_vienna(index, name)
+  else if (source == "Yahoo") get_yahoo(index, name) 
+  else if (source == "IHS") get_ihs(index, name) 
   else warning("Unknown source.") 
 }
 
@@ -23,14 +24,13 @@ lookup_index <- function(indexname) {
   return("Function to be implemented.")
 }
 
-get_msci <- function(index) {
+get_msci <- function(index, name) {
   url <- paste0("http://www.msci.com/webapp/indexperf/charts?indices=",
                 index,
                 ",V,38&startDate=31%20Dec,%201987&priceLevel=0&currency=15&frequency=M&scope=R&format=XLS&baseValue=false&site=gimi")
   
   GET(url, write_disk(tf <- tempfile(fileext = ".xls")))
   data <- read_excel(tf, skip = 6, n_max = nrow(read_excel(tf))-22)
-  #unlink(tf)
   
   return(data %>% mutate(Date = as.Date(Date)))
 }
@@ -123,13 +123,14 @@ get_bnp <- function(index) {
   
   file.remove(paste0(SF,"/Index.xlsx"))
   return(data)
-}
+} 
+# end of get_bnp()
 
 get_ftse <- function(index) {
   url <- paste0("https://www.ftse.com/analytics/factsheets/Home/DownloadHistoricIndex/?indexdetails=", 
   index)
   
-  GET(url, write_disk(tf <- tempfile(fileext = ".xls")))
+  GET(url, write_disk(tf <- tempfile(fileext = ".xlsx")))
   data <- read_excel(tf, range = "B9:D100") %>% filter(!is.na(Date))
   
   return(data %>% mutate(Date = as.Date(Date)))
@@ -167,4 +168,8 @@ get_vienna <- function(index) {
 get_yahoo <- function(index) {
   data <- tq_get(index, from = "1950-01-01", freq = "M") %>% select(Data = date, adjusted)
   return(data)
+}
+
+get_ihs <- function(index) {
+  return("The function to get index data from IHS Markit is not working yet.")
 }
