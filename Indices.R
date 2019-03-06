@@ -12,7 +12,7 @@ SF = "E:temp"
 
 ff64 = "c:/PROGRAMS/Firefox/FirefoxPortable/App/Firefox64/firefox.exe"
 eCap1 <- list(`moz:firefoxOptions` = list(binary = ff64), pageLoadStrategy = 'none', timeouts = list(pageLoad = 10))
-              #timeouts = list(script = 5, pageLoad = 10))
+#timeouts = list(script = 5, pageLoad = 10))
 eCap2 <- makeFirefoxProfile(list("browser.download.panel.shown" = FALSE,
                                  "browser.download.manager.showWhenStarting" =  FALSE,
                                  "browser.download.dir" = SF,
@@ -21,7 +21,7 @@ eCap2 <- makeFirefoxProfile(list("browser.download.panel.shown" = FALSE,
                                  "browser.download.manager.showAlertOnComplete" = FALSE,
                                  "browser.download.animateNotifications" = FALSE,
                                  "browser.helperApps.neverAsk.saveToDisk" = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                          ))
+))
 
 rS = rsDriver(browser = "firefox", port = 4566L, extraCapabilities = c(eCap1, eCap2))
 rDr <- rS[['client']]
@@ -79,7 +79,7 @@ for (i in 1:nrow(bnp)) {  #i=i+1
   #download.file(hrf[[1]], destfile = "E:/temp/x.xls", extra = )
   #tryCatch(expr = evalWithTimeout(rDr$navigate(hrf[[1]]), cpu = 2, timeout = 3),
   #         TimeoutException = function(ex) cat("Timeout. Skipping.\n"))
-    
+  
   # pass to wget
   #cookies = rDr$getAllCookies()
   #url = hrf[[1]]
@@ -132,4 +132,3 @@ repeat {
   print(paste("i:",i,"|",idx,cur))
   Sys.sleep(WAIT/5)
 }
-  

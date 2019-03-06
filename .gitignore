@@ -2,3 +2,7 @@
 .Rhistory
 .RData
 .Ruserdata
+.private
+data/
+mydata/
+temp.cvs
