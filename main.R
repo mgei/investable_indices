@@ -21,7 +21,7 @@ Quandl.api_key(qdl_key)
 
 #
 Basiswerte <- read_excel("Basiswerte.xlsx")
-r <- 85 #nrow(Basiswerte)
+r <- nrow(Basiswerte)
 
 for (row in 1:r) {
   if (is.na(Basiswerte[row, "Source"] %>% pull())) {

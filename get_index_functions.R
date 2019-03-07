@@ -28,7 +28,7 @@ get_index <- function(index, source, name = index, col = "", file = "") {
   else if (source == "MSCI_dl") get_msci_dl(file)
   else if (source == "HFR_dl") get_hfr_dl(file, col)
   else if (source == "DL") get_dl(file)
-  else if (source == "PIM CO") get_pmc(file)
+  else if (source == "PIMCO") get_pmc(file)
   else if (source == "DL_xl") get_dl_xl(file)
   else warning("Unknown source.") 
 }
@@ -118,8 +118,7 @@ get_bnp <- function(index) {
     bv$clickElement()
     Sys.sleep(WAIT)
     
-    rDr$close()
-    rS$server$stop()
+    
   }
   
   # whole file
@@ -209,7 +208,7 @@ get_six3 <- function(index, col) {
   data <- read_csv2("temp.csv", skip = 2) 
   
   data <- data[-1:-4,] %>% 
-    rename(Date = "SYMBOL") %>% 
+    rename(Date = "Symbol") %>% 
     mutate(Date = as.Date(Date, "%d.%m.%Y")) %>% 
     mutate_if(is.character, funs(as.numeric(.))) %>% 
     select(Date, col)
@@ -327,8 +326,8 @@ get_dl <- function(file) {
 }
 
 get_pmc <- function(file) {
-  data <- read_excel(paste0("./data/", file)) %>% 
-    mutate(Date = as.Date(Date)) %>%
+  data <- read_csv(paste0("./data/", file)) %>% 
+    mutate(Date = mdy_hms(`As of Date`) %>% as.Date()) %>%
     select(Date, value = `Index Level`)
   return(data)
 }
