@@ -35,4 +35,6 @@ System: Ubuntu 16.04, R 3.5.2, Firefox Quantum 65.0
 * Error `Error in curl::curl_fetch_disk(url, x$path, handle = handle) : SSL certificate problem: unable to get local issuer certificate` could be solved with https://stackoverflow.com/a/54660072
 * Error `Error in wdman::selenium(port = port, verbose = verbose, version = version,  : Selenium server signals port = 4566 is already in use.`: no solution found yet, https://stackoverflow.com/a/43993442 didn't help
 
+# PCA use case
 
+See in `PCA` directory. Published on RPubs here: http://rpubs.com/mgei/pca-usecase
