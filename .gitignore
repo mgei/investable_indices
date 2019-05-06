@@ -1,8 +1,8 @@
-.Rproj.user
-.Rhistory
-.RData
-.Ruserdata
-.private
+*.Rproj.user
+*.Rhistory
+*.RData
+*.Ruserdata
+*.private
 data/
 mydata/
 temp.cvs
