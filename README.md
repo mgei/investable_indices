@@ -38,3 +38,8 @@ System: Ubuntu 16.04, R 3.5.2, Firefox Quantum 65.0
 # PCA use case
 
 See in `PCA` directory. Published on RPubs here: http://rpubs.com/mgei/pca-usecase
+
+# European bank stocks
+
+See in `european-banks` directory. Available on RPubs: http://rpubs.com/mgei/european-banks
+
