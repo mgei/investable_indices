@@ -1,0 +1,135 @@
+---
+title: "The Market as of June 2019"
+author: "Martin Geissmann"
+date: "6/3/2019"
+output: html_document
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE)
+```
+
+# What's up?
+
+Uncertainty in many things.
+
+* US' new deal
+    * trade war China, US, Mexico
+    * import taxes and trade barriers (Huawei)
+* instability in middle East
+    * Iran, Isreal, Saudi Arabia
+    * Turkey
+* EU
+    * post parliament elections
+    * Austria Ibiza scandal
+    * Brexit
+
+# A closer look
+
+## Equities
+
+```{r libraries}
+library(tidyverse)
+library(tidyquant)
+library(gganimate)
+library(readr)
+```
+
+```{r equities}
+
+etfs <- tq_get(c("SPY", "GLD", "SLV", "TUR", "EWW", "GXC"),
+               get  = "stock.prices",
+               from = "2009-01-01",
+               to   = Sys.Date())
+
+etfs_p <- etfs %>% 
+  mutate(plot = case_when(symbol %in% c("SPY") ~ "1 S&P500",
+                          symbol %in% c("GLD", "SLV") ~ "2 Metals",
+                          symbol %in% c("TUR", "EWW", "GXC") ~ "3 Mexico, China, Turkey",
+                          T ~ "undef"))
+
+
+etfs_p %>% 
+  filter(year(date) >= 2019) %>% 
+  group_by(symbol) %>%
+  mutate(adjusted_rel = adjusted/first(adjusted)-1) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = date, y = adjusted_rel, color = symbol)) +
+  geom_line() +
+  geom_vline(xintercept = date("2019-03-03")) +
+  scale_y_continuous(labels = scales::percent) +
+  facet_wrap(~plot, ncol = 1)
+
+```
+
+### VIX
+
+```{r vix}
+
+vix <- tq_get(c("^VIX"),
+               get  = "stock.prices",
+               from = "2009-01-01",
+               to   = Sys.Date()) %>% 
+  mutate(symbol = "VIX")
+
+vix %>% 
+  # filter(year(date) >= 2019) %>% 
+  # group_by(symbol) %>%
+  # mutate(adjusted_rel = adjusted/first(adjusted)-1) %>% 
+  # ungroup() %>% 
+  ggplot(aes(x = date, y = adjusted, color = symbol)) +
+  geom_line() +
+  geom_smooth() +
+  # geom_vline(xintercept = date("2019-03-03")) +
+  # scale_y_continuous(labels = scales::percent) +
+  theme_bw()
+
+```
+
+### Yields
+
+```{r yields}
+
+# CHF
+chf_yiels <- dataseries::ds(c("REN.1J", "REN.10J", "REN.30J", "REN.20J",
+                              "REN.9J", "REN.8J", "REN.7J", "REN.6J",
+                              "REN.5J", "REN.4J", "REN.3J", "REN.2J"))
+
+chf_yiels_clean <- chf_yiels %>% 
+  as_tibble() %>% 
+  gather(series, value, -time) %>%  
+  separate(series, into = c("descr", "term"), sep = "\\.") %>% 
+  mutate(termY = str_remove(term, "J") %>% as.numeric()) %>% 
+  # filter(month(time) == 1, year(time) > 2000) %>% 
+  filter(year(time) > 2016) %>% 
+  mutate(year = year(time))
+
+chf_yiels <- read_csv2("snb-data-rendoblim-en-selection-20190603_1430.csv", skip = 3) %>% 
+  mutate(Date = ymd(paste0(Date, "-01")), 
+         term = D0 %>% str_remove("J") %>% as.numeric(),
+         Value = as.numeric(Value))
+
+chf_yiels %>% 
+  filter(year(Date) %in% c(2015, 2016, 2017, 2018, 2019)) %>% 
+  ggplot(aes(x = term, y = Value, alpha = Date, color = as.numeric(Date), group = Date, linetype = (Date < max(Date)))) +
+  geom_line() +
+  scale_color_continuous(low = "blue", high = "red") +
+  # scale_size_continuous(breaks = c(0.25, 0.5)) +
+  theme_bw()
+
+
+
+
+chf_yiels_clean
+
+chf_yiels_clean %>% 
+  ggplot(aes(x = termY, y = value)) + # , group = as.factor(time)
+  geom_line() +
+  # geom_label(x = 0.2, y = 0.8, aes(label = paste0("Year: ", year))) +
+  geom_label(x = 5, y = 0, aes(label = paste0(time)), size = 4) +
+  transition_states(time)
+
+```
+
+
+### Swiss franc
