@@ -3,6 +3,7 @@
 *.RData
 *.Ruserdata
 *.private
+*.key
 data/
 mydata/
 temp.cvs

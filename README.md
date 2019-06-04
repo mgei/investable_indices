@@ -39,7 +39,16 @@ System: Ubuntu 16.04, R 3.5.2, Firefox Quantum 65.0
 
 See in `PCA` directory. Published on RPubs here: http://rpubs.com/mgei/pca-usecase
 
+![](./graphs/pca-1.png)
+
 # European bank stocks
 
 See in `european-banks` directory. Available on RPubs: http://rpubs.com/mgei/european-banks
 
+![](./graphs/banks-1.png)
+
+# Market June 2019 - VIX and the inverted yield curve
+
+https://mgei.github.io/post/market-june19/
+
+![](./graphs/yields-1.png)
