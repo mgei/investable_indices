@@ -52,3 +52,9 @@ See in `european-banks` directory. Available on RPubs: http://rpubs.com/mgei/eur
 https://mgei.github.io/post/market-june19/
 
 ![](./graphs/yields-1.png)
+
+# Portfolio performance evaluation
+
+https://mgei.github.io/post/performance-eval/
+
+![](./graphs/riskreturn-1.png)

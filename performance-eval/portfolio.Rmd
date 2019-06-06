@@ -6,7 +6,7 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = F, warning = F, message = F)
+knitr::opts_chunk$set(echo = T, warning = F, message = F)
 ```
 
 ```{r packages}
@@ -216,7 +216,7 @@ portfolio_returns %>% mutate(symbol = "Portfolio") %>%
 
 How did the portfolio grow over time? Need wealth index. Also we want data for the SMI and SPI for comparison. This is available from [SIX](https://www.six-group.com/exchanges/indices/data_centre/shares/smi_en.html).
 
-```{r sixdata}
+```{r sixdata, eval = F}
 # SMI
 url <- "https://www.six-group.com/exchanges/downloads/indexdata/hsmi.csv"
 GET(url, write_disk("data/temp.csv", overwrite = T))
