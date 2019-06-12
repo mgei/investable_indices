@@ -58,5 +58,3 @@ https://mgei.github.io/post/market-june19/
 https://mgei.github.io/post/performance-eval/
 
 ![](./graphs/riskreturn-1.png)
-
-.
