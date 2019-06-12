@@ -1,7 +1,5 @@
 # a collection of R functions to download stock index data
 
-.
-
 ...works only in predefined specific setting. Not robust at all!
 
 As of March 3, 2019 automatic download works for:
