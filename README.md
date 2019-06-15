@@ -58,3 +58,10 @@ https://mgei.github.io/post/market-june19/
 https://mgei.github.io/post/performance-eval/
 
 ![](./graphs/riskreturn-1.png)
+
+# R various
+
+2019-06-11 Using ggplotly rangeslider for interactive relative performance (stock returns)
+Stackoverflow: https://stackoverflow.com/questions/56551892/using-ggplotly-rangeslider-for-interactive-relative-performance-stock-returns
+
+Not solved yet.
