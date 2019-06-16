@@ -61,7 +61,9 @@ https://mgei.github.io/post/performance-eval/
 
 # R various
 
-2019-06-11 Using ggplotly rangeslider for interactive relative performance (stock returns)
+## Using plotly's rangeslider for relative performance graphs
+
+![](./graphs/rangesliding-performance.png)
+
 Stackoverflow: https://stackoverflow.com/questions/56551892/using-ggplotly-rangeslider-for-interactive-relative-performance-stock-returns
 
-Not solved yet.
