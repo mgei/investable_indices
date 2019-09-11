@@ -71,7 +71,9 @@ for (row in 1:r) {
 
   }
   
-  data <- data %>% rename(Date = 1, adjusted = 2)
+  data <- data %>% 
+    rename(Date = 1, adjusted = 2) %>% 
+    filter(adjusted > 0)
   
   indexdata <- bind_rows(indexdata,
                          data %>% mutate(Basiswert = pull(Basiswerte[row, "Basiswert"])))
@@ -95,19 +97,24 @@ for (row in 1:r) {
 }
 
 indexdata_chf %>% 
-  filter(!is.na(adjusted)) %>% 
+  filter(!is.na(adjusted), year(Date) >= 2000) %>% 
   group_by(Basiswert) %>% 
   tq_transmute(select = adjusted, mutate_fun = to.monthly, indexAt = "lastof") -> yolo
 
 yolo %>% 
   mutate(cumret = adjusted/first(adjusted)-1) %>% 
-  filter(cumret > 100)
+  filter(Date == max(Date)) %>% 
+  arrange((cumret))
+
+indexdata_chf %>% filter(Basiswert == "SMIM Swiss Market Index Mid (TR)") %>% 
+  tail()
+
   
-  
+yolo %>% 
+  mutate(cumret = adjusted/first(adjusted)-1) %>% 
   ggplot(aes(x = Date, y = cumret, color = Basiswert)) + 
   geom_line() +
   theme(legend.position = "none")
-  
 
 
 

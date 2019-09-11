@@ -14,4 +14,4 @@ https://www.youtube.com/watch?v=lJkgcYIJ3lE
 * 25% nominal bonds and inflation linked bonds (for growth + falling market expectations)
 * 25% equities and nominal bonds {is this right?} (for inflation + falling market expectations)
 
-
+Diversification recudes the risk (the systematic risk) without reducing the return.
