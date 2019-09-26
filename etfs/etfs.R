@@ -50,3 +50,20 @@ etfs %>%
   ggplot(aes(y = YTD, x = `Asset Class`)) +
   geom_boxplot() +
   geom_point(aes(color = `Asset Class`))
+
+
+
+# # ETFDB API
+# url <- "https://etfdb.com/api/screener/"
+# 
+# response <- GET(url,
+#                 add_headers("Content-Type" = "application/json",
+#                             page = 2,
+#                             per_page = 25,
+#                             sort_by = "ytd",
+#                             sort_direction = "desc",
+#                             only =  c("meta", "data")))
+# 
+# response
+# 
+# POST(url, )

@@ -67,3 +67,51 @@ https://mgei.github.io/post/performance-eval/
 
 Stackoverflow: https://stackoverflow.com/questions/56551892/using-ggplotly-rangeslider-for-interactive-relative-performance-stock-returns
 
+# ETFDB.com download data
+
+[etfdb.com screener](https://etfdb.com/screener/) is a great tool for finding ETFs. As of today, there are 2290 ETFs listed. I like to sort by total assets, which is default.
+
+Unfortunately, the site uses pagination and things to prevent people from scraping the whole list. I had no chance to get it done from R directly. But I found [janlukasschroeder/etfdb-api](https://github.com/janlukasschroeder/etfdb-api) which provides functions to download the whole list from the screener.
+
+To get it to run:
+
+1. Install things if you had never used Node.js or React (like myself)
+
+Follow this if you're on Ubuntu: https://www.techomoro.com/how-to-install-and-setup-a-react-app-on-ubuntu-18-04-1/
+
+```
+curl -sL https://deb.nodesource.com/setup_12.x | sudo -E bash -
+sudo apt-get install -y nodejs
+```
+
+```
+sudo npm install npm@latest -g
+```
+
+```
+npm install -g create-react-app
+```
+
+(might need sudo)
+
+2. Make a new file `data.js` (is this even the file ending one uses for node.js?)
+
+```
+const etfdb = require('etfdb-api');
+
+etfdb
+  .listEtfs((perPage = 2290), (page = 1), (sort = 'assets'), (order = 'desc'))
+  .then(result => {
+    console.log('Total ETFs:', result.meta.total_records);
+    console.log('etf.symbol.text, etf.name.text, etf.mobile_title, etf.assets, etf.average_volume, etf.asset_class, etf.ytd');
+    result.data.forEach(etf => console.log(etf.symbol.text, ';', etf.name.text, ';', etf.mobile_title, ';', etf.assets, ';', etf.average_volume, ';', etf.asset_class, ';', etf.ytd));
+  });
+```
+
+3. Run with `node data.js` or actually save the output to a csv with
+
+```
+node data.js > output.csv2
+```
+
+4. Import to R
