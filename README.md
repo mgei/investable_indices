@@ -67,7 +67,9 @@ https://mgei.github.io/post/performance-eval/
 
 Stackoverflow: https://stackoverflow.com/questions/56551892/using-ggplotly-rangeslider-for-interactive-relative-performance-stock-returns
 
-# ETFDB.com download data
+# ETFs
+
+## etfdb.com download data
 
 [etfdb.com screener](https://etfdb.com/screener/) is a great tool for finding ETFs. As of today, there are 2290 ETFs listed. I like to sort by total assets, which is default.
 
@@ -115,3 +117,7 @@ node data.js > output.csv2
 ```
 
 4. Import to R
+
+## Performance
+
+![](./graphs/etfs.png)

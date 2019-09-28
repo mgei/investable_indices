@@ -4,8 +4,8 @@ const etfdb = require('etfdb-api');
 etfdb
   .listEtfs((perPage = 2290), (page = 1), (sort = 'assets'), (order = 'desc'))
   .then(result => {
-    console.log('Total ETFs:', result.meta.total_records);
-    console.log('etf.symbol.text, etf.name.text, etf.mobile_title, etf.assets, etf.average_volume, etf.asset_class, etf.ytd');
+    //console.log('Total ETFs:', result.meta.total_records);
+    console.log('etf.symbol.text; etf.name.text; etf.mobile_title; etf.assets; etf.average_volume; etf.asset_class; etf.ytd');
     result.data.forEach(etf => console.log(etf.symbol.text, ';', etf.name.text, ';', etf.mobile_title, ';', etf.assets, ';', etf.average_volume, ';', etf.asset_class, ';', etf.ytd));
   });
 

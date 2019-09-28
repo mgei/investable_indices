@@ -1,5 +1,4 @@
-Total ETFs: 2290
-etf.symbol.text, etf.name.text, etf.mobile_title, etf.assets, etf.average_volume, etf.asset_class, etf.ytd
+etf.symbol.text; etf.name.text; etf.mobile_title; etf.assets; etf.average_volume; etf.asset_class; etf.ytd
 SPY ; SPDR S&P 500 ETF ; SPY - SPDR S&P 500 ETF ; $274,867.84 ; 69,881,672 ; Equity ; 20.75%
 IVV ; iShares Core S&P 500 ETF ; IVV - iShares Core S&P 500 ETF ; $186,800.73 ; 4,020,662 ; Equity ; 20.71%
 VTI ; Vanguard Total Stock Market ETF ; VTI - Vanguard Total Stock Market ETF ; $122,151.46 ; 2,720,192 ; Equity ; 20.46%
