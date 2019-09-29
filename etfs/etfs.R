@@ -77,11 +77,15 @@ etfs <- read_csv2("output.csv2") %>%
          etf.average_volume = etf.average_volume %>% str_remove_all("\\$|,") %>% as.double(),
          etf.ytd = etf.ytd %>% str_remove_all("%") %>% as.double() %>% divide_by(100))
 
+etfs %<>% 
+  mutate(leverage = str_detect(etf.name.text, "2x|3x|2X|3X|4x|4X|leverage|Leverage|inverse|Inverse|UltraPro|Ultra"))
+
 # mark LETFs
+  
+  
 etfs %>% 
   filter(!is.na(etf.ytd)) %>% 
-  mutate(leverage = str_detect(etf.name.text, "2x|3x|2X|3X|leverage|Leverage|inverse|Inverse|UltraPro|Ultra"),
-         color = if_else(leverage, "AAA", etf.asset_class)) %>% 
+  mutate(color = if_else(leverage, "AAA", etf.asset_class)) %>% 
   ggplot(aes(x = etf.asset_class, y = etf.ytd)) +
   geom_point(aes(color = color, size = etf.assets), alpha = 0.5, position = position_jitter(w = 0.3, h = 0)) +
   geom_boxplot(outlier.shape = NA, alpha = 0) +
@@ -102,3 +106,18 @@ RColorBrewer::display.brewer.all()
 display.brewer.pal(n = 8, name = 'RdBu')
 
 
+symbols <- etfs %>% 
+  filter(!leverage,
+         etf.assets > 100) %>% 
+  pull(etf.symbol.text)
+
+
+library(tidyquant)
+
+for (symbol in symbols) {
+  assign(symbol, tq_get(symbol, get  = "stock.prices", from = "2000-01-01", to = Sys.Date()))
+  
+  write_csv(get(symbol), str_c("data/", symbol, ".csv"))
+  
+  rm(list=symbol)
+}
