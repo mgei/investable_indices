@@ -75,7 +75,7 @@ etfs <- read_csv2("output.csv2") %>%
   mutate_all(str_trim) %>% 
   mutate(etf.assets = etf.assets %>% str_remove_all("\\$|,") %>% as.double(),
          etf.average_volume = etf.average_volume %>% str_remove_all("\\$|,") %>% as.double(),
-         etf.ytd = etf.ytd %>% str_remove_all("%") %>% as.double() %>% divide_by(100))
+         etf.ytd = etf.ytd %>% str_remove_all("%") %>% as.double() %>% prod(0.01))
 
 etfs %<>% 
   mutate(leverage = str_detect(etf.name.text, "2x|3x|2X|3X|4x|4X|leverage|Leverage|inverse|Inverse|UltraPro|Ultra"))

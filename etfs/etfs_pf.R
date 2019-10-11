@@ -49,8 +49,25 @@ temp %>%
 temp %>% 
   ungroup() %>%
   select(-launch, -launchdbl, -symbol) %>% 
-  spread(launchsymbol, weekly.returns) -> temp
+  spread(launchsymbol, weekly.returns) %>% 
+  fill(2:ncol(.), .direction = "down") -> temp
 
 colnames(temp) <- c("date", symbol_colnames)
 
-temp %>% View()
+temp %>% 
+  filter(row_number() != 1) -> wrets_wide
+
+wrets_wide %>% 
+  mutate(available = rowSums(!is.na(.))-1) %>% 
+  select(available, everything()) %>% 
+  filter(available >= 500) %>% 
+  select(2:(.$available[1]+2)) -> yolo
+
+yolo %>% View()
+
+yolo %>% 
+  select(-date) %>% 
+  as.matrix() %>% 
+  prcomp(scale. = T, center = T)
+
+
