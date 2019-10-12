@@ -15,8 +15,8 @@ for (file in directory) {
   temp <- read_csv(paste0("pricedata/", file), col_types = "Ddddddd") %>% 
     tq_transmute(select     = open:adjusted, 
                  mutate_fun = to.period, 
-                 period     = "months") %>% 
-    mutate(date = ceiling_date(date, unit = "months") - days(1)) %>% 
+                 period     = "weeks") %>% 
+    mutate(date = ceiling_date(date, unit = "weeks") - days(1)) %>% 
     select(date, !!str_remove(file, ".csv") := adjusted)
   
   pricedata %<>% full_join(temp, by = "date")
@@ -69,5 +69,85 @@ yolo %>%
   select(-date) %>% 
   as.matrix() %>% 
   prcomp(scale. = T, center = T)
+
+
+## simulate ----
+
+simulate_performance <- function(returns, xdate, wback, wforth) {
+  
+  if (class(xdate) != "Date") {
+    xdate <- as.Date(xdate)
+  }
+  
+  xdate <- returns %>% 
+    ungroup() %>% 
+    select(date) %>% 
+    distinct() %>% 
+    arrange(date) %>% 
+    mutate(dat = abs(date - xdate)) %>%
+    filter(dat == abs(min(dat))) %>% 
+    select(date) %>% 
+    first() %>% 
+    pull()
+  
+  xminus <- xdate - weeks(wback)
+  xplus  <- xdate + weeks(wforth)  
+  
+  training <- wrets %>% 
+    group_by(symbol) %>% 
+    filter(first(date) <= xminus, last(date) >= xplus) %>% 
+    ungroup() %>% 
+    filter(date >= xminus, date <= xdate) %>% 
+    # the following is to avoid the symbols that have a gap in the return history (we need returna for all weeks)
+    group_by(symbol) %>% 
+    mutate(n = n()) %>% 
+    ungroup() %>% 
+    filter(n == max(n)) %>% 
+    select(-n)
+  
+  training_matrix <- training %>% 
+    spread(symbol, weekly.returns, fill = 0) %>% 
+    select(-date) %>% 
+    as.data.frame() %>% 
+    as.matrix()
+  
+  # training_matrix %>% View()
+  
+  training_matrix %>% prcomp(scale. = T, center = T) %>% .$rotation %>% 
+    as.data.frame() %>% 
+    rownames_to_column(var = "symbol") %>% 
+    as_tibble() -> pca_loadings
+  
+  pca_loadings %>%   
+    mutate_if(is.numeric, abs) %>% 
+    filter(symbol %in% c("SPY", "GLD", "AGG", "IVV"))
+  
+  pca_loadings %>% 
+    mutate_if(is.numeric, abs) %>%
+    arrange(desc(PC1))
+  
+  training_matrix[,c(1,2,223,224,225)] %>% View()
+  
+  # FVC 
+  wrets %>% 
+    ungroup() %>% 
+    filter(symbol == "FVC") %>% View()
+    ggplot(aes(x = date, y = weekly.returns)) +
+    geom_col()
+    
+    group_by(symbol) %>% 
+    summarise(f = first(date),
+              l = last(date))
+    group_by(symbol) %>% 
+  }
+  
+  
+  
+}
+
+returns <- wrets
+
+xdate <- as.Date("2016-01-02")
+
 
 
