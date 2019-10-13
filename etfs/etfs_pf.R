@@ -1,6 +1,8 @@
 library(tidyverse)
 library(tidyquant)
 library(magrittr)
+library(plotly)
+library(htmlwidgets)
 
 # load data we have in csv form ----
 directory <- list.files("pricedata/.")
@@ -118,6 +120,32 @@ simulate_performance <- function(returns, xdate, wback, wforth) {
     rownames_to_column(var = "symbol") %>% 
     as_tibble() -> pca_loadings
   
+  (top_loadings <- pca_loadings %>%
+    # mutate_if(is.numeric, abs) %>% 
+    filter(PC1 == max(PC1) | PC2 == max(PC2) | PC3 == max(PC3) | PC4 == max(PC4) |
+           PC1 == min(PC1) | PC2 == min(PC2) | PC3 == min(PC3) | PC4 == min(PC4)) %>% 
+    arrange(desc(PC1), desc(PC2), desc(PC3), desc(PC4)))
+  
+  pca_symbols <- top_loadings %>% 
+    pull(symbol)
+  
+  pca_symbols_pricedata <- pricedata %>%
+    gather(symbol, adjusted, -date) %>% 
+    filter(symbol %in% pca_symbols) %>% 
+    group_by(symbol) %>% 
+    arrange(date) %>% 
+    fill(adjusted) %>% 
+    ungroup() %>% 
+    filter(!is.na(adjusted))
+    
+  
+  performance_plot(pca_symbols_pricedata, from = xminus, to = xdate)
+  
+  performance_plot(pca_symbols_pricedata)
+  
+  
+  
+  
   pca_loadings %>%   
     mutate_if(is.numeric, abs) %>% 
     filter(symbol %in% c("SPY", "GLD", "AGG", "IVV"))
@@ -150,4 +178,56 @@ returns <- wrets
 xdate <- as.Date("2016-01-02")
 
 
+
+performance_plot <- function(pdata, from = NA, to = NA) {
+  
+  if (is.na(from)) {
+    from <- min(pdata$date)
+  }
+  if (is.na(to)) {
+    from <- max(pdata$date)
+  }
+  
+  
+  pdata %>% 
+    group_by(symbol) %>% 
+    summarise(adj1 = adjusted[1L])
+  
+  
+  pltly <- 
+    pdata %>% 
+    dplyr::group_by(symbol) %>% 
+    dplyr::mutate(adjusted = adjusted / adjusted[1L]) %>% 
+    plotly::plot_ly(x = ~date, y = ~adjusted, color = ~symbol,
+                    type = "scatter", mode = "lines") %>% 
+    plotly::layout(dragmode = "zoom", 
+                   datarevision = 0) %>% 
+    rangeslider(start = from, end = to)
+  
+  onRenderRebaseTxt <- "
+  function(el, x) {
+      el.on('plotly_relayout', function(rlyt) {
+        var nrTrcs = el.data.length;
+        // array of x index to rebase to; defaults to zero when all x are shown, needs to be one per trace
+        baseX = Array.from({length: nrTrcs}, (v, i) => 0);
+        // if x zoomed, increase baseX until first x point larger than x-range start
+        if (el.layout.xaxis.autorange == false) {
+            for (var trc = 0; trc < nrTrcs; trc++) {
+                while (el.data[[trc]].x[baseX[trc]] < el.layout.xaxis.range[0]) {baseX[trc]++;}
+            }   
+        }
+        // rebase each trace
+        for (var trc = 0; trc < nrTrcs; trc++) {
+            el.data[trc].y = el.data[[trc]].y.map(x => x / el.data[[trc]].y[baseX[trc]]);
+        }
+        el.layout.yaxis.autorange = true; // to show all traces if y was zoomed as well
+        el.layout.datarevision++; // needs to change for react method to show data changes
+        Plotly.react(el, el.data, el.layout);
+
+    });
+  }
+  "
+  
+  htmlwidgets::onRender(pltly, onRenderRebaseTxt)
+}
 

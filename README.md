@@ -69,7 +69,7 @@ Stackoverflow: https://stackoverflow.com/questions/56551892/using-ggplotly-range
 
 # ETFs
 
-## etfdb.com download data
+## etfdb.com download data with etfdb-api
 
 [etfdb.com screener](https://etfdb.com/screener/) is a great tool for finding ETFs. As of today, there are 2290 ETFs listed. I like to sort by total assets, which is default.
 
@@ -117,6 +117,35 @@ node data.js > output.csv2
 ```
 
 4. Import to R
+
+
+## etfdb.com download data with r-selenium
+
+1. Install Docker
+
+https://docs.docker.com/install/linux/docker-ce/ubuntu/
+
+2. Pull docker image for server
+
+`docker pull selenium/standalone-firefox:2.53.0`
+
+3. Start container server
+
+`$ docker run -d -p 4445:4444 selenium/standalone-firefox:2.53.0`
+
+4. Back to R
+
+If not already installed do:
+
+```r
+install.packages('RSelenium')
+install.packages('rvest')
+```
+
+Run *etfs/erfdb_selenium.r*.
+
+
+
 
 ## Performance
 
