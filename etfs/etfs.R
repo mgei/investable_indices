@@ -78,10 +78,12 @@ etfs <- read_csv2("output.csv2") %>%
          etf.average_volume = etf.average_volume %>% str_remove_all("\\$|,") %>% as.double(),
          etf.ytd = etf.ytd %>% str_remove_all("%") %>% as.double() %>% divide_by(100))
 
-etfs %<>% 
-  mutate(leverage = str_detect(etf.name.text, "2x|3x|2X|3X|4x|4X|leverage|Leverage|inverse|Inverse|UltraPro|Ultra"))
-
 # mark LETFs
+etfs %<>% 
+  mutate(leverage = case_when(str_detect(etf.name.text, "Short-Term|Short Term|Short Duration|Short Maturity|Short Treasury") ~ F,
+                              str_detect(etf.name.text, "2x|3x|2X|3X|4x|4X|leverage|Leverage|inverse|Inverse|UltraPro|Ultra") ~ T,
+                              str_detect(etf.name.text, "Short|short") ~ T,
+                              T ~ F))
   
   
 etfs %>% 
@@ -182,7 +184,7 @@ pricedata %>%
                                       symbol, NA_character_), hjust = 1), 
                   nudge_y = -100, direction = "y",
                   color = "black", size = 3) +
-  # scale_y_continuous(labels = "none") +
+  scale_y_date(limits = c(as.Date("1999-01-01"), (Sys.Date() + 40))) +
   scale_color_manual(values = RColorBrewer::brewer.pal(9, "Set1")) +
   coord_flip() +
   theme_bw() + 
@@ -190,7 +192,10 @@ pricedata %>%
        title = "Historical availability of ETFs",
        caption = "Data: etfdb.com, finance.yahoo.com") +
   theme(#axis.text=element_text(size=4),
-        axis.text.y = element_blank())
+        axis.text.y = element_blank(),
+        panel.grid = element_blank(),
+        panel.border = element_blank()) +
+  guides(colour=guide_legend(override.aes=list(size=4)))
 
 pricedata %>% arrange(date)
 

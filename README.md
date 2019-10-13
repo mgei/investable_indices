@@ -131,7 +131,7 @@ https://docs.docker.com/install/linux/docker-ce/ubuntu/
 
 3. Start container server
 
-`$ docker run -d -p 4445:4444 selenium/standalone-firefox:2.53.0`
+`docker run -d -p 4445:4444 selenium/standalone-firefox:2.53.0`
 
 4. Back to R
 
@@ -150,3 +150,7 @@ Run *etfs/erfdb_selenium.r*.
 ## Performance
 
 ![](./graphs/etfs.png)
+
+## Availability
+
+![](./graphs/etf_availability.png)

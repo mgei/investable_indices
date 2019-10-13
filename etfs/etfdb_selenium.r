@@ -27,7 +27,7 @@ remDr$open()
 main_page <- remDr$navigate(paste0(url,1))
 Sys.sleep(1)
 j=1
-while (j <= 92) {
+while (j <= 4) { # 92
   #shell('docker pull selenium/standalone-firefox:2.53.0')
   #shell('docker run -d -p 4445:4444 selenium/standalone-firefox:2.53.0')
   curl<-paste0(url,j)
