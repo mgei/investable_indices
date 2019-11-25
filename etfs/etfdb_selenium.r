@@ -3,9 +3,8 @@ library(rvest)
 library(RSelenium)
 library(tidyverse)
 
-
 ###############################################
-##########       SCRAP FUNCTION       #########
+##########       SCRAPE FUNCTION      #########
 ###############################################
 
 temp_etfs<-function(main_page) {
@@ -24,10 +23,11 @@ remDr <- remoteDriver(browserName = "firefox",remoteServerAddr = "localhost", po
 remDr$open()
 
 #navigate to the url
-main_page <- remDr$navigate(paste0(url,1))
+tab = "&tab=expenses"
+main_page <- remDr$navigate(paste0(url,1, tab))
 Sys.sleep(1)
 j=1
-while (j <= 4) { # 92
+while (j <= 1) { # 92
   #shell('docker pull selenium/standalone-firefox:2.53.0')
   #shell('docker run -d -p 4445:4444 selenium/standalone-firefox:2.53.0')
   curl<-paste0(url,j)

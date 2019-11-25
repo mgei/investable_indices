@@ -2,11 +2,11 @@ const etfdb = require('etfdb-api');
 
 // list all ETFs, sorted by year-to-date return, descending sort direction
 etfdb
-  .listEtfs((perPage = 2290), (page = 1), (sort = 'assets'), (order = 'desc'))
+  .listEtfs((perPage = 2321), (page = 1), (sort = 'assets'), (order = 'desc')) 
   .then(result => {
     //console.log('Total ETFs:', result.meta.total_records);
     console.log('etf.symbol.text; etf.name.text; etf.mobile_title; etf.assets; etf.average_volume; etf.asset_class; etf.ytd; etf.inception');
-    result.data.forEach(etf => console.log(etf.symbol.text, ';', etf.name.text, ';', etf.mobile_title, ';', etf.assets, ';', etf.average_volume, ';', etf.asset_class, ';', etf.ytd, ';', etf.inception));
+    result.data.forEach(etf => console.log(etf.symbol.text, ';', etf.name.text, ';', etf.mobile_title, ';', etf.assets, ';', etf.average_volume, ';', etf.asset_class, ';', etf.ytd, ';', etf.date));
   });
 
 // show first 15 holdings of TQQQ, sorted by weighting (DESC)

@@ -120,11 +120,18 @@ simulate_performance <- function(returns, xdate, wback, wforth) {
     rownames_to_column(var = "symbol") %>% 
     as_tibble() -> pca_loadings
   
-  (top_loadings <- pca_loadings %>%
+  top_loadings <- pca_loadings %>%
     # mutate_if(is.numeric, abs) %>% 
-    filter(PC1 == max(PC1) | PC2 == max(PC2) | PC3 == max(PC3) | PC4 == max(PC4) |
-           PC1 == min(PC1) | PC2 == min(PC2) | PC3 == min(PC3) | PC4 == min(PC4)) %>% 
-    arrange(desc(PC1), desc(PC2), desc(PC3), desc(PC4)))
+    select(1:5) %>% 
+    filter_if(is.numeric, any_vars(. %in% c(min(.),max(.)))) %>% 
+    mutate_if(is.numeric, function(x){if_else(x %in% c(min(x), max(x)), paste0(as.character(round(x, 3)), "*"), as.character(round(x, 3)))}) %>% 
+    left_join(etfs %>% select(symbol = etf.symbol.text, name = etf.name.text, assetclass = etf.asset_class),
+              by = "symbol") %>% 
+    select(symbol, name, assetclass, PC1, PC2, PC3, PC4)
+  
+  top_loadings
+  
+  
   
   pca_symbols <- top_loadings %>% 
     pull(symbol)

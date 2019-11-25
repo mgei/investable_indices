@@ -72,7 +72,7 @@ library("RColorBrewer")
 # POST(url, )
 
 
-etfs <- read_csv2("output.csv2") %>% 
+etfs <- read_csv2("output.csv2") %>% #read_delim("output.csv2", delim = ";") %>% 
   mutate_all(str_trim) %>% 
   mutate(etf.assets = etf.assets %>% str_remove_all("\\$|,") %>% as.double(),
          etf.average_volume = etf.average_volume %>% str_remove_all("\\$|,") %>% as.double(),
@@ -139,7 +139,7 @@ directory <- list.files("pricedata/.")
 
 # empty tibble for prices, needs the date column
 pricedata <- tibble(date = as.Date("1900-01-01")) %>% 
-  filter(date != as.Date("1900-01-01"))
+  filter(F)
 
 for (file in directory) {
   print(paste(which(directory == file), file))
@@ -156,6 +156,8 @@ for (file in directory) {
   
   print("done")
 }
+
+pricedata
 
 file <- "SPY.csv"
 
@@ -197,7 +199,67 @@ pricedata %>%
         panel.border = element_blank()) +
   guides(colour=guide_legend(override.aes=list(size=4)))
 
-pricedata %>% arrange(date)
+
+## 2019-11-24
+
+# inception_dates <- GET("https://etfdb.com/etf-launch-center/#Launches-2011")
+#   
+# inception_dates <- inception_dates %>% read_html() %>% html_table()
+# 
+# inception_dates_tibble <- lapply(inception_dates, as_tibble) %>% bind_rows() 
+#   
+# inceptions <- inception_dates_tibble %>%
+#   filter(!is.na(Date)) %>% 
+#   mutate(Date = mdy(Date)) %>% 
+#   select(symbol = Ticker, inception = Date)
+# 
+# inceptions %>% write_csv("inceptions.csv")
+
+inceptions <- read_csv("inceptions.csv")
+
+pricedata <- pricedata %>% 
+  arrange(date) %>% 
+  gather(symbol, price, -date) %>% 
+  filter(!is.na(price)) %>% 
+  left_join(inceptions, by = "symbol") %>% 
+  filter(date >= inception) %>% 
+  select(-inception) %>% 
+  distinct() %>% 
+  spread(symbol, price)
+
+returns <- pricedata %>% 
+  arrange(date) %>% 
+  gather(symbol, price, -date) %>%
+  filter(!is.na(price)) %>% 
+  group_by(symbol) %>% 
+  filter(min(date) <= periods_from[y]) %>% 
+  tq_transmute(select     = price, 
+               mutate_fun = periodReturn, 
+               period     = "monthly", 
+               type       = "arithmetic") %>% 
+  ungroup()
+  
+returns %>% 
+  arrange(-monthly.returns)
+
+etfs %>% 
+  filter(etf.symbol.text == "SHE") %>% 
+  glimpse()
+
+pricedata %>% 
+  select(1, SPY) %>% 
+  rename(price = 2) %>% 
+  mutate(return = price/lag(price)-1) %>% 
+  gather(view, value, -date) %>% 
+  ggplot(aes(x = date)) + 
+  geom_line(aes(y = if_else(view == "price", value, NA_real_))) +
+  geom_col(aes(y = if_else(view == "return", value, NA_real_),
+               fill = if_else(value < 0, "green", "red"))) +
+  facet_wrap(~view,
+             nrow = 2,
+             scales = "free_y") +
+  theme(legend.position = "none")
+
 
 periods_from <- seq(as.Date("2000-01-31"), as.Date("2019-01-31"), by = "years")
 periods_to   <- periods_from + years(1) - months(1)
