@@ -154,3 +154,7 @@ Run *etfs/erfdb_selenium.r*.
 ## Availability
 
 ![](./graphs/etf_availability.png)
+
+# Migros Bank Vorsorgefonds
+
+![](./graphs/vorsorgefonds.png)
