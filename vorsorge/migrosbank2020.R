@@ -101,7 +101,8 @@ nav %>%
   scale_y_continuous(labels = percent) +
   geom_hline(yintercept = 0, color = "red", alpha = 0.4) +
   labs(title = "Migros Bank Vorsorgefonds",
-       subtitle = "annual returns and volatility")
+       subtitle = "annual returns and volatility",
+       x = "sigma", y = "mu")
   # geom_smooth(aes(color = name), method = "lm", fullrange = T, se = F)
 
 
