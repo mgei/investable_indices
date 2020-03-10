@@ -1,0 +1,11 @@
+--2020-03-10 15:26:09--  https://app2.msci.com/products/indexes/performance/regional_chart.html?chart=regional
+Resolving app2.msci.com (app2.msci.com)... 104.66.182.147
+Connecting to app2.msci.com (app2.msci.com)|104.66.182.147|:443... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 6985 (6.8K) [text/html]
+Saving to: ‘regional_chart.html?chart=regional’
+
+          regional_   0%[                    ]       0  --.-KB/s               regional_chart.html 100%[===================>]   6.82K  --.-KB/s    in 0s      
+
+2020-03-10 15:26:09 (223 MB/s) - ‘regional_chart.html?chart=regional’ saved [6985/6985]
+

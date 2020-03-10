@@ -1,0 +1,167 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<!-- template: header -->
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+
+<meta name="description" content="MSCI is a leading provider of investment decision support tools to investors globally, including asset managers, banks, hedge funds and pension funds. Our products and services include indices, portfolio risk and performance analytics, and governance tools.">
+
+<meta name="keywords" content="MSCI, Barra, FEA, RiskMetrics, EAFE, equity, indices, index, risk, analytics, models, portfolio construction, optimization, analysis, performance benchmarking, attribution, hedge funds, asset allocation, investment research, management, international, riskmanager, var">
+
+<link rel="stylesheet" href="/css/mbmain.css" type="text/css">
+
+<script type="text/javascript" src="/js/jquery-1.3.2.min.js"></script>
+<script type="text/javascript" src="/js/jquery.dimensions.min.js"></script>
+<script type="text/javascript" src="/js/jquery.menu.js"></script>
+<script type="text/javascript" src="/js/jquery.printElement.min.js"></script>
+<script type="text/javascript" src="/js/jqglobal.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+<script type="text/javascript" src="/js/AC_OETags.js"></script>
+<script language="JavaScript" type="text/javascript">
+<!--
+// -----------------------------------------------------------------------------
+// Globals
+// Major version of Flash required
+var requiredMajorVersion = 9;
+// Minor version of Flash required
+var requiredMinorVersion = 0;
+// Minor version of Flash required
+var requiredRevision = 0;
+// -----------------------------------------------------------------------------
+// -->
+</script>
+
+
+
+
+
+
+
+<script type="text/javascript" src="/scripts/mscibarra.js"></script>
+
+
+
+
+		<title>Regional Performance Chart - Performance - MSCI</title>
+	</head>
+
+	<body id="professional-website" class="mt-main-index layout-wm">
+		<div id="container">
+			<div id="container-inner">
+
+
+<p>MSCI Indexes are recalculated daily around 1830 EDT. During this time the index levels may be unavailable for a short period of time.</p><p><a onclick="openDownload()" href="#"><img height="16" alt="" hspace="3" width="17" border="0" src="/furniture/csv.gif" />Download Data</a></p><script language="Javascript">
+		<!--
+			var objURL = new Array();
+			window.location.search.replace(
+				new RegExp( "([^?=&]+)(=([^&]*))?", "g" ),
+				function( $0, $1, $2, $3 ){
+					objURL.push($1 + "=" + $3);
+				}
+			);
+			flashVars = objURL.join("&");
+		-->
+	</script><script language="JavaScript">
+    		function openDownload() {
+	                var chart = document.getElementById("perfChart");
+        		var href = chart.urlForDownload();
+        		window.location = href;
+    		}
+	</script><script language="JavaScript" type="text/javascript">
+			<!--
+			// Version check for the Flash Player that has the ability to start Player Product Install (6.0r65)
+			var hasProductInstall = DetectFlashVer(6, 0, 65);
+			
+			// Version check based upon the values defined in globals
+			var hasRequestedVersion = DetectFlashVer(requiredMajorVersion, requiredMinorVersion, requiredRevision);
+			
+			
+			// Check to see if a player with Flash Product Install is available and the version does not meet the requirements for playback
+			if ( hasProductInstall && !hasRequestedVersion ) {
+				// MMdoctitle is the stored document.title value used by the installation process to close the window that started the process
+				// This is necessary in order to close browser windows that are still utilizing the older version of the player after installation has completed
+				// DO NOT MODIFY THE FOLLOWING FOUR LINES
+				// Location visited after installation is complete if installation is required
+				var MMPlayerType = (isIE == true) ? "ActiveX" : "PlugIn";
+				var MMredirectURL = window.location;
+			    document.title = document.title.slice(0, 47) + " - Flash Player Installation";
+			    var MMdoctitle = document.title;
+			
+				AC_FL_RunContent(
+					"src", "playerProductInstall",
+					"FlashVars", "MMredirectURL="+MMredirectURL+'&MMplayerType='+MMPlayerType+'&MMdoctitle='+MMdoctitle+"",
+					"width", "600",
+					"height", "658",
+					"align", "middle",
+					"id", "perfChart",
+					"quality", "high",
+					"bgcolor", "#869ca7",
+					"name", "perfChart",
+					"allowScriptAccess","sameDomain",
+					"type", "application/x-shockwave-flash",
+					"pluginspage", "http://www.adobe.com/go/getflashplayer"
+				);
+			} else if (hasRequestedVersion) {
+				// if we've detected an acceptable version
+				// embed the Flash Content SWF when all tests are passed
+				AC_FL_RunContent(
+						"src", "perfChart",
+						"width", "600",
+						"height", "658",
+						"align", "middle",
+						"id", "perfChart",
+						"quality", "high",
+						"bgcolor", "#869ca7",
+						"name", "perfChart",
+						"flashvars", flashVars,
+						"allowScriptAccess","sameDomain",
+						"type", "application/x-shockwave-flash",
+						"pluginspage", "http://www.adobe.com/go/getflashplayer"
+				);
+			  } else {  // flash is too old or we can't detect the plugin
+			    var alternateContent = 'Browser plug-in not found. '
+			  	+ 'This content requires the Adobe Flash Player. '
+			   	+ '<a href=http://www.adobe.com/go/getflash/>Get Flash</a>';
+			    document.write(alternateContent);  // insert non-flash content
+			  }
+			// -->
+			</script><p>&nbsp;</p><p>Copyright MSCI Inc.</p><p>This data is the exclusive property of MSCI Inc. (MSCI) and may not be reproduced or redisseminated in any form without prior written permission from MSCI. This information is provided on an &quot;as is&quot; basis, and the user of this information assumes the entire risk of any use made of this information. Neither MSCI nor any other party makes any express or implied warranties or representations with respect to this information (or the results to be obtained by the use thereof), and MSCI hereby expressly disclaims all warranties of originality, accuracy, completeness, merchantability or fitness for a particular purpose with respect to any of this information. Without limiting any of the foregoing, in no event shall MSCI or any other party have any liability for any direct, indirect, special, punitive, consequential or any other damages (including lost profits) even if notified of the possibility of such damages. MSCI and the MSCI indexes are services marks of MSCI.</p>
+
+
+
+
+<!-- template: Footer Standalone -->
+
+</div>
+</div>
+
+<script type="text/javascript">
+var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+</script>
+<script type="text/javascript">
+try {
+var pageTracker = _gat._getTracker("UA-397044-1");
+pageTracker._trackPageview();
+} catch(err) {}</script>
+
+
+</body>
+</html>
+<!-- // template: Footer Standalone -->
+
+
+
+
+
+
