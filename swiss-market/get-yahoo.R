@@ -22,6 +22,8 @@ for (i in 224:nrow(stocks)) { # nrow(stocks)
   Sys.sleep(1)
 }
 
+tq_get("FIR.SW")
+
 data_backup <- data
 
 data %>% distinct()
@@ -56,11 +58,13 @@ data %>%
   ggplot(aes(x = 1, y = return30)) +
   geom_boxplot()
 
+y <- quantmod::getSymbols(Symbols = "INT.SW", auto.assign = F, src = "yahoo")
   
 url <- paste0("https://www.six-group.com/exchanges/shares/info_details_en.html?id=", stocks[1, "ISIN"] %>% pull() , "CHF4", "&portalSegment=EQ") 
 
 stocks %>% group_by(`Index member`) %>% count()
 
+tq_get("INT.SW")
 
 library(rvest)
 url <- paste0("https://www.six-group.com/exchanges/shares/info_details_en.html?id=", stocks[1, "ISIN"] %>% pull() , "CHF4", "&portalSegment=EQ") 
