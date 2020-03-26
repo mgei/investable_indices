@@ -2,6 +2,12 @@ library(shiny)
 library(tidyverse)
 library(tidyquant)
 library(lubridate)
+# library(shinyWidgets)
+# library(shinysky)
+library(plotly)
+
+stocks <- readRDS("data/cache/AAPL.RDS")$data
+
 
 cache_dir <- "data/cache/"
 
@@ -38,7 +44,8 @@ get_prices <- function(symbol,
   
   # get from yahoo finance
   # print("get data from yh")
-  out <- tq_get(x = symbol, from = from, to = to)
+  out <- tq_get(x = symbol, from = from, to = to) %>% 
+    mutate("symbol" = symbol)
   
   if (exists("cached")) {
     # print("cached was loaded exists")
@@ -57,5 +64,3 @@ get_prices <- function(symbol,
   
   return(out)
 }
-
-
