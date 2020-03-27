@@ -1,4 +1,6 @@
 source("setup.R")
+source("data.R")
+
 
 ui <- fluidPage(
   fluidRow(
@@ -19,11 +21,11 @@ ui <- fluidPage(
                        tabPanel("Table", "tbl")
            )),
     column(3, "")
-    )
+  )
 )
 
 server <- function(input, output, session) {
-
+  
   output$picked <- renderText({
     input$stock_picker
   })
@@ -31,9 +33,9 @@ server <- function(input, output, session) {
   output$searched <- renderText({
     input$stock_search
   })
-
   
-    
+  
+  
   stock_picked <- reactive({
     req(input$stock_picker)
     
@@ -44,7 +46,7 @@ server <- function(input, output, session) {
   
   stock_searched <- reactive({
     req(input$stock_search)
-
+    
     if (input$stock_search != "") {
       print("yes")
       get_prices(symbol = input$stock_search)
@@ -73,7 +75,7 @@ server <- function(input, output, session) {
                      datarevision = 0) %>% 
       rangeslider()
     
-
+    
     
     htmlwidgets::onRender(pltly, onRenderRebaseTxt)
   })

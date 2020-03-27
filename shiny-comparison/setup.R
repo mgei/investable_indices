@@ -1,15 +1,16 @@
 options(shiny.reactlog = TRUE)
 
 library(shiny)
-library(tidyverse)
+library(argonR)
+library(argonDash)
+# library(tidyverse)
 library(tidyquant)
 library(lubridate)
 library(shinyWidgets)
 # library(shinysky)
 library(plotly)
-
-stocks <- readRDS("data/cache/AAPL.RDS")$data
-
+library(httr)
+library(readxl)
 
 cache_dir <- "data/cache/"
 
@@ -96,3 +97,14 @@ onRenderRebaseTxt <- "
       });
     }
     "
+
+
+reload_fundlist <- function() {
+  url <- "https://www.six-group.com/exchanges/funds/explorer_export_en.xls"
+  GET(url, write_disk("data/fundlist.xls", overwrite = T))
+  fundlist <- read_xls("data/temp.xls", skip = 4)
+  
+  fundlist %>% saveRDS("data/fundlist.RDS")
+  
+  return(fundlist)
+}
