@@ -158,3 +158,7 @@ Run *etfs/erfdb_selenium.r*.
 # Migros Bank Vorsorgefonds
 
 ![](./graphs/vorsorgefonds.png)
+
+# Function to get fund or ETF details and dividends from SIX Financial Exchange
+
+see in *swiss-market/get_six.R*.

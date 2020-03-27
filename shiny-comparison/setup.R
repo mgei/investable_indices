@@ -1,8 +1,10 @@
+options(shiny.reactlog = TRUE)
+
 library(shiny)
 library(tidyverse)
 library(tidyquant)
 library(lubridate)
-# library(shinyWidgets)
+library(shinyWidgets)
 # library(shinysky)
 library(plotly)
 
@@ -44,7 +46,13 @@ get_prices <- function(symbol,
   
   # get from yahoo finance
   # print("get data from yh")
-  out <- tq_get(x = symbol, from = from, to = to) %>% 
+  out <- tq_get(x = symbol, from = from, to = to)
+  
+  if (!is_tibble(out)) {
+    stop("no data available")
+  }
+  
+  out <- out %>% 
     mutate("symbol" = symbol)
   
   if (exists("cached")) {
@@ -64,3 +72,27 @@ get_prices <- function(symbol,
   
   return(out)
 }
+
+
+onRenderRebaseTxt <- "
+    function(el, x) {
+      el.on('plotly_relayout', function(rlyt) {
+        var nrTrcs = el.data.length;
+        // array of x index to rebase to; defaults to zero when all x are shown, needs to be one per trace
+        baseX = Array.from({length: nrTrcs}, (v, i) => 0);
+        // if x zoomed, increase baseX until first x point larger than x-range start
+        if (el.layout.xaxis.autorange == false) {
+            for (var trc = 0; trc < nrTrcs; trc++) {
+                while (el.data[[trc]].x[baseX[trc]] < el.layout.xaxis.range[0]) {baseX[trc]++;}
+            }   
+        }
+        // rebase each trace
+        for (var trc = 0; trc < nrTrcs; trc++) {
+            el.data[trc].y = el.data[[trc]].y.map(x => x / el.data[[trc]].y[baseX[trc]]);
+        }
+        el.layout.yaxis.autorange = true; // to show all traces if y was zoomed as well
+        el.layout.datarevision++; // needs to change for react method to show data changes
+        Plotly.react(el, el.data, el.layout);
+      });
+    }
+    "

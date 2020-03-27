@@ -1,18 +1,70 @@
 source("setup.R")
 
 ui <- fluidPage(
-  # textInput("symbol"),
-  plotlyOutput("performanceplot")
-  
+  fluidRow(
+    column(4,
+           pickerInput(inputId = "stock_picker", label = "previous", choices = c("", str_remove(list.files("data/cache/"), ".RDS")))),
+    column(4,
+           textInput(inputId = "stock_search", label = "search", value = "")),
+    column(4, "")
+  ),
+  fluidRow(
+    column(3, 
+           textOutput("picked"),
+           textOutput("searched")),
+    column(6,
+           tabsetPanel(type = "tabs",
+                       tabPanel("Plot", plotlyOutput("performanceplot")),
+                       tabPanel("Summary", "sum"),
+                       tabPanel("Table", "tbl")
+           )),
+    column(3, "")
+    )
 )
 
 server <- function(input, output, session) {
-  # output$text <- renderText({
-  #   input$symbol
-  # })
+
+  output$picked <- renderText({
+    input$stock_picker
+  })
+  
+  output$searched <- renderText({
+    input$stock_search
+  })
+
+  
+    
+  stock_picked <- reactive({
+    req(input$stock_picker)
+    
+    if (input$stock_picker != "") {
+      get_prices(symbol = input$stock_picker)
+    }
+  })
+  
+  stock_searched <- reactive({
+    req(input$stock_search)
+
+    if (input$stock_search != "") {
+      print("yes")
+      get_prices(symbol = input$stock_search)
+    }
+  })
+  
+  stock <- reactive({
+    print(stock_searched())
+    
+    if (!is.null(stock_searched())) {
+      stock_searched()
+    } else {
+      stock_picked()
+    }
+  })
   
   output$performanceplot <- renderPlotly({
-    pltly <- stocks %>% 
+    # validate(need(stock()))
+    
+    pltly <- stock() %>% 
       dplyr::group_by(symbol) %>% 
       dplyr::mutate(adjusted = adjusted / adjusted[1L]) %>% 
       plotly::plot_ly(x = ~date, y = ~adjusted, color = ~symbol,
@@ -21,28 +73,7 @@ server <- function(input, output, session) {
                      datarevision = 0) %>% 
       rangeslider()
     
-    onRenderRebaseTxt <- "
-    function(el, x) {
-      el.on('plotly_relayout', function(rlyt) {
-        var nrTrcs = el.data.length;
-        // array of x index to rebase to; defaults to zero when all x are shown, needs to be one per trace
-        baseX = Array.from({length: nrTrcs}, (v, i) => 0);
-        // if x zoomed, increase baseX until first x point larger than x-range start
-        if (el.layout.xaxis.autorange == false) {
-            for (var trc = 0; trc < nrTrcs; trc++) {
-                while (el.data[[trc]].x[baseX[trc]] < el.layout.xaxis.range[0]) {baseX[trc]++;}
-            }   
-        }
-        // rebase each trace
-        for (var trc = 0; trc < nrTrcs; trc++) {
-            el.data[trc].y = el.data[[trc]].y.map(x => x / el.data[[trc]].y[baseX[trc]]);
-        }
-        el.layout.yaxis.autorange = true; // to show all traces if y was zoomed as well
-        el.layout.datarevision++; // needs to change for react method to show data changes
-        Plotly.react(el, el.data, el.layout);
-      });
-    }
-    "
+
     
     htmlwidgets::onRender(pltly, onRenderRebaseTxt)
   })
