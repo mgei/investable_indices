@@ -17,15 +17,18 @@ ui <- fluidPage(
            )
     ),
   fluidRow(
-    column(12,
-           uiOutput("missing_data"))
-    ),
-  fluidRow(
     column(2,
+           materialSwitch(
+             inputId = "performance_price",
+             label = "%-Performance",
+             value = TRUE,
+             right = T,
+             status = "danger"),
            materialSwitch(
              inputId = "currency_chf",
              label = "im CHF",
              value = TRUE, 
+             right = T,
              status = "danger")
            ),
     column(6,
@@ -33,13 +36,13 @@ ui <- fluidPage(
                        tabPanel(year(Sys.Date()), plotOutput("ytd_plot")),
                        tabPanel("2 years", plotOutput("2yr_plot")),
                        tabPanel("since inception", tableOutput("max_plot")))
-    ),
+           ),
     column(4, tabsetPanel(type = "tabs",
-                          tabPanel("Holdings", plotlyOutput("holdingsplot")),
+                          tabPanel("Holdings", plotOutput("holdingsplot")),
                           tabPanel("Summary", "summary"))),
     column(4, 
            "stats selected")
-  ),
+    ),
   fluidRow(
     column(12,
            "table")
@@ -92,60 +95,86 @@ server <- function(input, output, session) {
     return(out)
   })
   
-  output$missing_data <- renderUI({
-    
-    req(data_selected())
-    
-    if (is.na(data_selected()$prices)) {
-      shinydashboard::box(title = "Missing data", background = "yellow",
-                          width = 12)
-    }
-    
-  })
-  
-  
   output$ytd_plot <- renderPlot({
     
     req(data_selected())
     
-    if (!is.na(data_selected()$prices)) {
+    prices <- data_selected()$prices
+    
+    if (is_tibble(prices)) {
       
-      data_selected()$prices %>% 
-        filter(date >= (Sys.Date() - years(2))) %>% 
-        dplyr::group_by(symbol) %>% 
-        dplyr::mutate(performance = (adjusted / adjusted[1L] - 1)) %>% 
-        ggplot(aes(x = date, y = performance)) +
-        geom_line(aes(color = symbol)) +
-        geom_label(data = data_selected()$dividends,
-                   aes(y = 0, x = Ex_dividend_date, label = paste0(Currency, Value)),
-                   alpha = 0.4) +
-        scale_y_continuous(labels = percent) +
-        scale_x_date(date_labels = "%d.%m.%Y") +
-        labs(title = "", x = "") +
-        theme_bw()
+      if (input$performance_price) {
+        p <- prices %>% 
+          filter(date >= (Sys.Date() - years(2))) %>% 
+          dplyr::group_by(symbol) %>% 
+          dplyr::mutate(performance = (close / close[1L] - 1)) %>% 
+          ungroup() %>% 
+          filter(!is.na(performance)) %>% 
+          ggplot(aes(x = date, y = performance)) +
+          geom_line(aes(color = symbol)) +
+          scale_y_continuous(labels = percent) +
+          scale_x_date(date_labels = "%d.%m.%Y") +
+          labs(title = "", x = "") +
+          theme_bw()
         
+        print(p)
+      } else {
+        p <- prices %>% 
+          filter(date >= (Sys.Date() - years(2))) %>% 
+          ggplot(aes(x = date, y = close)) +
+          geom_line(aes(color = symbol)) +
+          scale_y_continuous(labels = number) +
+          scale_x_date(date_labels = "%d.%m.%Y") +
+          labs(title = "", x = "", y = paste("closing price", data_selected()$TradingCurrency)) +
+          theme_bw()
+      }
+        
+      
+      dividends <- data_selected()$dividends %>% 
+        filter(Ex_dividend_date >= min(prices$date),
+               Ex_dividend_date <= max(prices$date))
+      
+      if (nrow(dividends) > 0) {
+        p <- p + 
+          geom_label(data = data_selected()$dividends,
+                     aes(y = 0, x = Ex_dividend_date, label = paste0(Currency, Value)),
+                     alpha = 0.4)
+      }
+      p
+    } else {
+      plot_exception("no data is found")
     }
     
   })
   
-  output$holdingsplot <- renderPlotly({
+  output$holdingsplot <- renderPlot({
     req(data_selected())
     
-    if (!is.na(data_selected()$holdings)) {
-      if (nrow(data_selected()$holdings) > 0) {
-        data_selected()$holdings %>% 
-          bind_rows(tibble(Company = "other", holding_num = 1 - sum(.$holding_num), holding = percent(holding_num, accuracy = 0.01))) %>% 
-          plot_ly(labels=~Company, values = ~holding_num, type = 'pie',
-                  textposition = 'inside',
-                  insidetextfont = list(color = '#FFFFFF'),
-                  hoverinfo = 'text',
-                  text = ~Company,
-                  marker = list(
-                    line = list(color = '#FFFFFF', width = 1)),
-                  showlegend = FALSE)
+    holdings <- data_selected()$holdings
+    
+    if (is_tibble(holdings)) {
+      if (nrow(holdings) > 0) {
         
-        print(data_selected()$dividends)
+        d <- holdings %>% 
+          bind_rows(tibble(Company = "_other", holding_num = 1 - sum(.$holding_num)) %>% 
+                      mutate(holding_num = max(holding_num, 0), holding = percent(holding_num, accuracy = 0.01))) %>% 
+          ggplot(aes(x = "", y = holding_num, fill = Company)) +
+          geom_col() +
+          geom_text_repel(aes(label = holding), position = position_stack(vjust = .5), size = 4) +
+          coord_polar("y", start = 0) +
+          labs(title = "Fund holdings",
+               fill = "") +
+          theme_void() +
+          theme(legend.position = "bottom",
+                legend.text = element_text(size = 9))
+        
+        d
+        
+      } else {
+        plot_exception("no holdings data is found")
       }
+    } else {
+      plot_exception("no holdings data is found")
     }
   })
   

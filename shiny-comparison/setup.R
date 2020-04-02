@@ -25,25 +25,23 @@ library(scales)
 get_prices_cache <- function(symbol, 
                              from = (floor_date(Sys.Date() - period(10, units = "years"), "month") - 1), 
                              to = (floor_date(Sys.Date(), "month") - 1),
-                             cache_dir = "data/cache/") {
+                             reload_if_older_than = "1 week",
+                             cache_dir = "data/cache_prices/") {
   if (!is.Date(from)) {
-    # print("from isnt a date")
     from <- ymd(from)
   }
   if (!is.Date(to)) {
-    # print("to isnt a date")
     to <- ymd(to)
   }
   if (is.na(from) | is.na(to)) {
-    stop("dates to/from are invalid")
+    return(NA)
+    # stop("dates to/from are invalid")
   }
                          
   if (paste0(symbol, ".RDS") %in% list.files(cache_dir)) {
-    # print("exists in chache")
     cached <- readRDS(paste0(cache_dir, symbol, ".RDS"))
     
     if (cached$from <= from & cached$to >= to) {
-      # print("only using cached data")
       out <- cached$data
       
       out <- out %>% 
@@ -51,16 +49,21 @@ get_prices_cache <- function(symbol,
                date <= to)
       
       return(out)
+    } else if (cached$loaddate + period(reload_if_older_than) >= Sys.Date()) {
+      out <- cached$data
+      
+      return(out)
     }
   }
   
   # get from yahoo finance
-  # print("get data from yh")
+  print("get prices from yh")
   suppressWarnings(out <- tq_get(x = symbol, from = from, to = to, complete_cases = T, warnings = F))
   
   if (!is_tibble(out)) {
-    return(NA)
-    stop("no data available")
+    out <- tibble(date = Sys.Date(),
+                  open = NA_real_, high = NA_real_, low = NA_real_, close = NA_real_, volume = NA_real_, adjusted = NA_real_) %>% 
+      filter(F)
   }
   
   out <- out %>% 
@@ -78,7 +81,8 @@ get_prices_cache <- function(symbol,
   # save to cached files
   list(from = from,
        to = to,
-       data = out) %>% 
+       data = out,
+       loaddate = Sys.Date()) %>% 
     saveRDS(paste0(cache_dir, symbol, ".RDS"))
   
   return(out)
@@ -187,6 +191,7 @@ get_six_details_cache <- function(ISIN, currency = "CHF", category = "funds", ou
   }
   
   # get from SIX
+  print("get details from six")
   suppressWarnings(out <- get_six_details(ISIN, currency, category))
   
   # save to cached files
@@ -195,7 +200,6 @@ get_six_details_cache <- function(ISIN, currency = "CHF", category = "funds", ou
     saveRDS(paste0(cache_dir, ISIN, "_", currency, ".RDS"))
   
   return(out)
-  
 }
 
 get_six_dividends <- function(ISIN, currency = "CHF", category = "funds") {
@@ -241,6 +245,7 @@ get_six_dividends_cache <- function(ISIN, currency = "CHF", category = "funds",
   }
   
   # get from SIX
+  print("get dividends from six")
   suppressWarnings(out <- get_six_dividends(ISIN, currency, category))
   
   if (!is_tibble(out)) {
@@ -279,8 +284,8 @@ get_holdings <- function(symbol) {
 get_holdings_cache <- function(symbol, 
                                reload_if_older_than = "1 month", cache_dir = "data/cache_holdings/") {
   
-  if (paste0(symbol, ".SW", ".RDS") %in% list.files(cache_dir)) {
-    cached <- readRDS(paste0(cache_dir, symbol, ".SW", ".RDS"))
+  if (paste0(symbol, ".RDS") %in% list.files(cache_dir)) {
+    cached <- readRDS(paste0(cache_dir, symbol, ".RDS"))
     
     if (cached$loaddate + period(reload_if_older_than) >= Sys.Date()) {
       out <- cached$data
@@ -290,20 +295,20 @@ get_holdings_cache <- function(symbol,
   }
   
   # get from SIX
-  suppressWarnings(out <- get_holdings(paste0(symbol, ".SW")))
+  print("get holdings from yh")
+  suppressWarnings(out <- get_holdings(symbol))
   
   if (!is_tibble(out)) {
-    return(NA)
-    stop("no data available")
+    out <- tibble(Company = NA_character_, Symbol = NA_character_, holding = NA_character_, holding_num = NA_real_) %>% 
+      filter(F)
   }
   
   # save to cached files
   list(loaddate = Sys.Date(),
        data = out) %>% 
-    saveRDS(paste0(cache_dir, symbol, ".SW", ".RDS"))
+    saveRDS(paste0(cache_dir, symbol, ".RDS"))
   
   return(out)
-  
 }
 
 reload_fundlist <- function() {
@@ -345,3 +350,26 @@ onRenderRebaseTxt <- "
       });
     }
     "
+
+plot_exception <-function(
+  ...,
+  sep=" ",
+  type=c("message","warning","cat","print"),
+  color="auto",
+  console=TRUE,
+  size = 6){      
+  type=match.arg(type)
+  txt = paste(...,collapse=sep)
+  if(console){
+    if(type == "message") message(txt)
+    if(type == "warning") warning(txt)
+    if(type == "cat") cat(txt)
+    if(type == "print") print(txt)
+  }
+  if(color =="auto") color <- if(type == "cat") "black" else "red"
+  if(txt == "warning") txt <- paste("warning:",txt)
+  print(ggplot2::ggplot() +
+          ggplot2::geom_text(ggplot2::aes(x=0,y=0,label=txt),color=color,size=size) + 
+          ggplot2::theme_void())
+  invisible(NULL)
+}
