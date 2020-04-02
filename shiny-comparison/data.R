@@ -1,3 +1,3 @@
 # data
 
-fundlist <- readRDS("data/fundlist.RDS")
+fundlist <- readRDS("data/fundlist_plus.RDS")

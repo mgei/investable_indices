@@ -373,3 +373,31 @@ plot_exception <-function(
           ggplot2::theme_void())
   invisible(NULL)
 }
+
+
+## datatable helper
+
+list_funds <- function(data, filter = F, searching = F,
+                       visible_cols = c("Name", "ISIN", "Symbol", "Issuer", "Trading currency", "Management fee", "Investment region")) {
+  
+  if (filter) {
+    filter <- "top"
+  } else {
+    filter <- "none"
+  }
+
+  data %>% 
+    datatable(filter = filter, 
+              options = list(pageLength = 10, autoWidth = F, searching = searching,  
+                             columnDefs = list(list(targets = c(0, which(!(names(.) %in% visible_cols))), 
+                                                    visible = F)),
+                             buttons = c('colvis'), dom = 'Bfritp',
+                             search = list(search = 'CHF')), 
+              selection = "single", class = 'compact cell-border') %>%
+      formatString(suffix = "%", columns = "Management fee") %>% 
+      formatStyle(columns = 1:37, fontSize = '80%')
+
+}
+  
+  
+  
