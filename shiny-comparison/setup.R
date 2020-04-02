@@ -14,6 +14,9 @@ library(plotly)
 library(httr)
 library(readxl)
 library(rvest)
+library(DT)
+library(magrittr)
+library(scales)
 
 
 
@@ -167,6 +170,32 @@ get_six_details <- function(ISIN, currency = "CHF", category = "funds", output =
   }
   
   return(out)
+}
+
+get_six_details_cache <- function(ISIN, currency = "CHF", category = "funds", output = "df",
+                                  reload_if_older_than = "1 month",
+                                  cache_dir = "data/cache_details/") {
+  
+  if (paste0(ISIN, "_", currency, ".RDS") %in% list.files(cache_dir)) {
+    cached <- readRDS(paste0(cache_dir, ISIN, "_", currency, ".RDS"))
+    
+    if (cached$loaddate + period(reload_if_older_than) >= Sys.Date()) {
+      out <- cached$data
+      
+      return(out)
+    }
+  }
+  
+  # get from SIX
+  suppressWarnings(out <- get_six_details(ISIN, currency, category))
+  
+  # save to cached files
+  list(loaddate = Sys.Date(),
+       data = out) %>% 
+    saveRDS(paste0(cache_dir, ISIN, "_", currency, ".RDS"))
+  
+  return(out)
+  
 }
 
 get_six_dividends <- function(ISIN, currency = "CHF", category = "funds") {
