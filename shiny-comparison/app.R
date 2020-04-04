@@ -39,18 +39,29 @@ ui <- fluidPage(
   ## 1.2. second row ----
   fluidRow(
     column(2,
+           radioGroupButtons(
+             inputId = "plot_period",
+             label = "xx",
+             choices = c(year(Sys.Date()), 
+                         "2 Jahre", "5 Jahre", "max."),
+             direction = "vertical",
+             size = "sm",
+             status = "primary",
+             selected = year(Sys.Date())
+             # individual = T
+           ),
            materialSwitch(
              inputId = "performance_price",
              label = "%-Performance",
              value = TRUE,
              right = T,
-             status = "danger"),
+             status = "primary"),
            materialSwitch(
              inputId = "currency_chf",
              label = "im CHF",
              value = TRUE, 
              right = T,
-             status = "danger")
+             status = "primary")
            ),
     column(6,
            tabsetPanel(type = "tabs",
@@ -186,65 +197,37 @@ server <- function(input, output, session) {
     f
   })
   
-  # fund_selected_reactive <- reactive({
-  #   
-  #   req(input$fund_list_dt_rows_selected)
-  #   
-  #   r <- input$fund_list_dt_rows_selected
-  #   
-  #   if (!is.null(r)) {
-  #     f <- fund_list_reactive()[r, ]
-  #   
-  #     prices <- get_prices_cache(f[["Symbol"]], ".SW")
-  #   
-  #     dividends <- get_six_dividends_cache(f[["ISIN"]], 
-  #                                          currency = f[["Trading currency"]])
-  #     
-  #     details <- get_six_details_cache(f[["ISIN"]], 
-  #                                      currency = f[["Trading currency"]])
-  #     
-  #     if (nrow(prices) < 1) {
-  #       holdings <- NA
-  #     } else {
-  #       holdings <- get_holdings_cache(f[["Symbol"]])
-  #     }
-  #     
-  #     out <- list(ISIN = fundlist[input$funds_list_rows_selected, "ISIN"],
-  #                 Symbol = fundlist[input$funds_list_rows_selected, "Symbol"],
-  #                 TradingCurrency = fundlist[input$funds_list_rows_selected, "Trading currency"],
-  #                 prices = prices,
-  #                 details = details,
-  #                 dividends = dividends,
-  #                 holdings = holdings)
-  #     
-  #     
-  #     out
-  #   }
-  # })
-  # 
-  x <- reactive({
+  fund_selected_reactive <- reactive({
     
     if (!is.null(input$fund_list_dt_rows_selected)) {
       f <- fund_list_reactive()[input$fund_list_dt_rows_selected, ]
       
       prices <- get_prices_cache(paste0(f[["Symbol"]], ".SW"))
       
+      dividends <- get_six_dividends_cache(f[["ISIN"]],
+                                           currency = f[["Trading currency"]])
+      
+      details <- get_six_details_cache(f[["ISIN"]], 
+                                       currency = f[["Trading currency"]])
+      
+          if (nrow(prices) < 1) {
+            holdings <- NA
+          } else {
+            holdings <- get_holdings_cache(paste0(f[["Symbol"]], ".SW"))
+          }
+      
       out <- list(ISIN = f[["ISIN"]],
-                  prices = prices)
+                  TradingCurrency = f[["Trading currency"]],
+                  prices = prices,
+                  dividends = dividends,
+                  details = details,
+                  holdings = holdings)
 
-      #     out <- list(ISIN = f[input$funds_list_dt_rows_selected, "ISIN"],
-      #                 Symbol = f[input$funds_list_dt_rows_selected, "Symbol"],
-      #                 TradingCurrency = f[input$funds_list_dt_rows_selected, "Trading currency"],
-      #                 prices = prices)
     } else {
       out <- list()
     }
     
     out
-  })
-  
-  observe({
-    print(x())
   })
   
   ## 2.1. list of funds ----
@@ -255,60 +238,76 @@ server <- function(input, output, session) {
   
   
   
-  # output$ytd_plot <- renderPlot({
-  #   
-  #   req(data_selected())
-  #   
-  #   prices <- data_selected()$prices
-  #   
-  #   if (is_tibble(prices)) {
-  #     if (nrow(prices) > 0) {
-  #       if (input$performance_price) {
-  #         p <- prices %>% 
-  #           filter(date >= (Sys.Date() - years(2))) %>% 
-  #           dplyr::group_by(symbol) %>% 
-  #           dplyr::mutate(performance = (close / close[1L] - 1)) %>% 
-  #           ungroup() %>% 
-  #           filter(!is.na(performance)) %>% 
-  #           ggplot(aes(x = date, y = performance)) +
-  #           geom_line(aes(color = symbol)) +
-  #           scale_y_continuous(labels = percent) +
-  #           scale_x_date(date_labels = "%d.%m.%Y") +
-  #           labs(title = "", x = "") +
-  #           theme_bw()
-  #         
-  #         print(p)
-  #       } else {
-  #         p <- prices %>% 
-  #           filter(date >= (Sys.Date() - years(2))) %>% 
-  #           ggplot(aes(x = date, y = close)) +
-  #           geom_line(aes(color = symbol)) +
-  #           scale_y_continuous(labels = number) +
-  #           scale_x_date(date_labels = "%d.%m.%Y") +
-  #           labs(title = "", x = "", y = paste("closing price", data_selected()$TradingCurrency)) +
-  #           theme_bw()
-  #       }
-  #       
-  #       
-  #       dividends <- data_selected()$dividends %>% 
-  #         filter(Ex_dividend_date >= min(prices$date),
-  #                Ex_dividend_date <= max(prices$date))
-  #       
-  #       if (nrow(dividends) > 0) {
-  #         p <- p + 
-  #           geom_label(data = data_selected()$dividends,
-  #                      aes(y = 0, x = Ex_dividend_date, label = paste0(Currency, Value)),
-  #                      alpha = 0.4)
-  #       }
-  #       p
-  #     } else {
-  #       plot_exception("no data is found")
-  #     }
-  #   } else {
-  #     plot_exception("no data is found")
-  #   }
-  #   
-  # })
+  output$ytd_plot <- renderPlot({
+
+    req(fund_selected_reactive())
+
+    prices <- fund_selected_reactive()$prices
+
+    if (is_tibble(prices)) {
+      if (nrow(prices) > 0) {
+        if (input$performance_price) {
+          p <- prices %>%
+            filter(date >= (Sys.Date() - years(2))) %>%
+            dplyr::group_by(symbol) %>%
+            dplyr::mutate(performance = (close / close[1L] - 1)) %>%
+            ungroup() %>%
+            filter(!is.na(performance)) %>%
+            ggplot(aes(x = date, y = performance)) +
+            geom_line(aes(color = symbol)) +
+            scale_y_continuous(labels = percent) +
+            scale_x_date(date_labels = "%d.%m.%Y") +
+            labs(title = "", x = "") +
+            theme_bw()
+
+          print(p)
+        } else {
+          p <- prices %>%
+            filter(date >= (Sys.Date() - years(2))) %>%
+            ggplot(aes(x = date, y = close)) +
+            geom_line(aes(color = symbol)) +
+            scale_y_continuous(labels = number) +
+            scale_x_date(date_labels = "%d.%m.%Y") +
+            labs(title = "", x = "", y = paste("closing price", fund_selected_reactive()$TradingCurrency)) +
+            theme_bw()
+        }
+
+
+        dividends <- fund_selected_reactive()$dividends %>%
+          filter(Ex_dividend_date >= min(prices$date),
+                 Ex_dividend_date <= max(prices$date))
+
+        if (nrow(dividends) > 0) {
+          p <- p +
+            geom_label(data = fund_selected_reactive()$dividends,
+                       aes(y = 0, x = Ex_dividend_date, label = paste0(Currency, Value)),
+                       alpha = 0.4)
+        }
+        
+        if (input$plot_period == "Aktuelles Jahr") {
+          p <- p + 
+            scale_x_date(limits = c(floor_date(Sys.Date(), "year"), Sys.Date()))
+        } else if (input$plot_period == "2 Jahre") {
+          p <- p + 
+            scale_x_date(limits = c(Sys.Date() - years(2), Sys.Date()))
+        } else if (input$plot_period == "5 Jahre") {
+          p <- p + 
+            scale_x_date(limits = c(Sys.Date() - years(5), Sys.Date()))
+        } else if (input$plot_period == "max.") {
+          p <- p + 
+            scale_x_date()
+        }
+        
+        p
+        
+      } else {
+        plot_exception("no data is found")
+      }
+    } else {
+      plot_exception("no data is found")
+    }
+
+  })
   # 
   # output$holdingsplot <- renderPlot({
   #   req(data_selected())
