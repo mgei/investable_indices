@@ -35,7 +35,6 @@ get_prices_cache <- function(symbol,
   }
   if (is.na(from) | is.na(to)) {
     return(NA)
-    # stop("dates to/from are invalid")
   }
                          
   if (paste0(symbol, ".RDS") %in% list.files(cache_dir)) {
@@ -60,14 +59,31 @@ get_prices_cache <- function(symbol,
   print("get prices from yh")
   suppressWarnings(out <- tq_get(x = symbol, from = from, to = to, complete_cases = T, warnings = F))
   
+  # get currency
+  url <- paste0("https://finance.yahoo.com/quote/", symbol, "/history?p=", symbol)
+  html <- read_html(url)
+  
+  text <- html %>% 
+    html_nodes("div .D\\(ib\\)") %>%
+    html_nodes("span") %>%
+    html_text()
+  
+  currency <- str_sub(y[grep("Currency in", text)], -3, -1)
+  
+  if (length(currency) == 0) {
+    currency <- ""
+  }
+  
   if (!is_tibble(out)) {
     out <- tibble(date = Sys.Date(),
-                  open = NA_real_, high = NA_real_, low = NA_real_, close = NA_real_, volume = NA_real_, adjusted = NA_real_) %>% 
+                  open = NA_real_, high = NA_real_, low = NA_real_, close = NA_real_, volume = NA_real_, adjusted = NA_real_, 
+                  currency = NA_character_) %>% 
       filter(F)
   }
   
   out <- out %>% 
-    mutate("symbol" = symbol)
+    mutate("currency" = currency, 
+           "symbol" = symbol)
   
   if (exists("cached")) {
     # print("cached was loaded exists")
@@ -325,6 +341,63 @@ reload_fundlist <- function() {
   return(fundlist)
 }
 
+reload_six_benchmark <- function() {
+  # SMI
+  url <- "https://www.six-group.com/exchanges/downloads/indexdata/hsmi.csv"
+  data <- read_csv2(url, skip = 1)
+  
+  smi <- data[-1:-4,] %>% 
+    rename(Date = "SYMBOL") %>% 
+    mutate(Date = as.Date(Date, "%d.%m.%Y")) %>% 
+    mutate_if(is.character, funs(as.numeric(.))) %>% 
+    select(date = Date, SMI, SMIC) %>% 
+    arrange(date) %>% 
+    mutate(SMI_return = SMI/lag(SMI)-1,
+           SMIC_predividend = lag(SMIC)*(1+SMI_return),
+           SMIC_dividend = SMIC - SMIC_predividend)
+  
+  # SPI
+  url <- "https://www.six-group.com/exchanges/downloads/indexdata/hspitr.csv"
+  data <- read_csv2(url, skip = 1) 
+  
+  spi_tr <- data[-1:-4,] %>% 
+    rename(Date = "SYMBOL") %>% 
+    mutate(Date = as.Date(Date, "%d.%m.%Y")) %>% 
+    mutate_if(is.character, funs(as.numeric(.))) %>% 
+    select(date = Date, SXGE) # SXGE is the TR index
+  
+  url <- "https://www.six-group.com/exchanges/downloads/indexdata/hspipr.csv"
+  data <- read_csv2(url, skip = 1) 
+  
+  spi_pr <- data[-1:-4,] %>% 
+    rename(Date = "SYMBOL") %>% 
+    mutate(Date = as.Date(Date, "%d.%m.%Y")) %>% 
+    mutate_if(is.character, funs(as.numeric(.))) %>% 
+    select(date = Date, SPIX) # SPIX is the Price index
+  
+  
+  spi <- spi_tr %>% 
+    full_join(spi_pr, by = "date") %>% 
+    filter(!is.na(SXGE),
+           !is.na(SPIX)) %>% 
+    arrange(date) %>% 
+    mutate(SPIX_return = SPIX/lag(SPIX)-1,
+           SXGE_predividend = lag(SXGE)*(1+SPIX_return),
+           SXGE_dividend = SXGE - SXGE_predividend)
+  
+  smi_long <- smi %>% 
+    pivot_longer(names_to = "series", values_to = "value", -date)
+  
+  spi_long <- spi %>% 
+    pivot_longer(names_to = "series", values_to = "value", -date)
+  
+  benchmarks <- bind_rows(smi_long, spi_long)
+  
+  benchmarks %>% saveRDS("data/benchmarks.RDS")
+  
+  return(benchmarks)
+}
+
 
 ## plotting helper ----
 
@@ -398,6 +471,7 @@ list_funds <- function(data, filter = F, searching = F,
       formatStyle(columns = 1:37, fontSize = '80%')
 
 }
-  
+
+
   
   

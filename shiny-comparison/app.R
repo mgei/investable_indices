@@ -42,12 +42,11 @@ ui <- fluidPage(
            radioGroupButtons(
              inputId = "plot_period",
              label = "xx",
-             choices = c(year(Sys.Date()), 
-                         "2 Jahre", "5 Jahre", "max."),
+             choices = c("akt. Jahr", "2 Jahre", "5 Jahre", "max."),
              direction = "vertical",
              size = "sm",
              status = "primary",
-             selected = year(Sys.Date())
+             selected = "akt. Jahr"
              # individual = T
            ),
            materialSwitch(
@@ -64,10 +63,7 @@ ui <- fluidPage(
              status = "primary")
            ),
     column(6,
-           tabsetPanel(type = "tabs",
-                       tabPanel(year(Sys.Date()), plotOutput("ytd_plot")),
-                       tabPanel("2 years", plotOutput("2yr_plot")),
-                       tabPanel("since inception", tableOutput("max_plot")))
+           plotOutput("main_plot")
            ),
     column(4, tabsetPanel(type = "tabs",
                           tabPanel("Holdings", plotOutput("holdingsplot")),
@@ -81,7 +77,7 @@ ui <- fluidPage(
            "table")
   )
 )
-
+  
 # 2. server ----
 server <- function(input, output, session) {
   
@@ -91,7 +87,8 @@ server <- function(input, output, session) {
     
     if ("nur vorhandene Daten" %in% input$fund_options) {
       f <- f %>% 
-        filter(prices_nrow > 1)
+        filter(prices_nrow > 1,
+               year(prices_max_date) == year(Sys.Date()))
     }
     
     if ("nur CHF" %in% input$fund_options) {
@@ -238,7 +235,7 @@ server <- function(input, output, session) {
   
   
   
-  output$ytd_plot <- renderPlot({
+  output$main_plot <- renderPlot({
 
     req(fund_selected_reactive())
 
@@ -260,7 +257,6 @@ server <- function(input, output, session) {
             labs(title = "", x = "") +
             theme_bw()
 
-          print(p)
         } else {
           p <- prices %>%
             filter(date >= (Sys.Date() - years(2))) %>%
@@ -284,7 +280,7 @@ server <- function(input, output, session) {
                        alpha = 0.4)
         }
         
-        if (input$plot_period == "Aktuelles Jahr") {
+        if (input$plot_period == "akt. Jahr") {
           p <- p + 
             scale_x_date(limits = c(floor_date(Sys.Date(), "year"), Sys.Date()))
         } else if (input$plot_period == "2 Jahre") {

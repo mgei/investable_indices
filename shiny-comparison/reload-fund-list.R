@@ -1,7 +1,7 @@
 fundlist <- readRDS("data/fundlist.RDS")
 
 # get data from YH and SIX
-for (i in 1:nrow(fundlist)) {
+for (i in 1940:nrow(fundlist)) {
   
   print(i)
   
@@ -18,7 +18,10 @@ for (i in 1:nrow(fundlist)) {
   
   print(i)
   
-  prices <- get_prices_cache(fundlist[i, "Symbol"] %>% pull() %>% paste0(".SW"))
+  prices <- get_prices_cache(fundlist[i, "Symbol"] %>% pull() %>% paste0(".SW")) %>% 
+    filter(!is.na(close))
+  
+  
   holdings <- get_holdings_cache(fundlist[i, "Symbol"] %>% pull() %>% paste0(".SW"))
   details <- get_six_details_cache(fundlist[i, "ISIN"] %>% pull(), 
                                    fundlist[i, "Trading currency"] %>% pull())
