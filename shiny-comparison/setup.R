@@ -17,6 +17,7 @@ library(rvest)
 library(DT)
 library(magrittr)
 library(scales)
+library(Quandl)
 
 
 
@@ -64,11 +65,11 @@ get_prices_cache <- function(symbol,
   html <- read_html(url)
   
   text <- html %>% 
-    html_nodes("div .D\\(ib\\)") %>%
+    # html_nodes("div .D\\(ib\\)") %>%
     html_nodes("span") %>%
     html_text()
   
-  currency <- str_sub(y[grep("Currency in", text)], -3, -1)
+  currency <- str_sub(text[grep("Currency in", text)], -3, -1)[1]
   
   if (length(currency) == 0) {
     currency <- ""
@@ -396,6 +397,54 @@ reload_six_benchmark <- function() {
   benchmarks %>% saveRDS("data/benchmarks.RDS")
   
   return(benchmarks)
+}
+
+reload_quandle_exchangerates <- function(quandl_key = read_file("data/quandl.key")) {
+  Quandl.api_key(quandl_key)
+  
+  EURCHF <- Quandl("ECB/EURCHF", start_date="2000-01-01") %>% as_tibble()
+  EURAUD <- Quandl("ECB/EURAUD", start_date="2000-01-01") %>% as_tibble()
+  EURCAD <- Quandl("ECB/EURCAD", start_date="2000-01-01") %>% as_tibble()
+  EURGBP <- Quandl("ECB/EURGBP", start_date="2000-01-01") %>% as_tibble()
+  EURHKD <- Quandl("ECB/EURHKD", start_date="2000-01-01") %>% as_tibble()
+  EURJPY <- Quandl("ECB/EURJPY", start_date="2000-01-01") %>% as_tibble()
+  EURNOK <- Quandl("ECB/EURNOK", start_date="2000-01-01") %>% as_tibble()
+  EURSEK <- Quandl("ECB/EURSEK", start_date="2000-01-01") %>% as_tibble()
+  EURSGD <- Quandl("ECB/EURSGD", start_date="2000-01-01") %>% as_tibble()
+  EURUSD <- Quandl("ECB/EURUSD", start_date="2000-01-01") %>% as_tibble()
+  
+  
+  currencies <- EURCHF %>% select(Date, EURCHF = Value) %>%
+    full_join(EURAUD %>% select(Date, EURAUD = Value),
+              by = "Date") %>% 
+    full_join(EURCAD %>% select(Date, EURCAD = Value),
+              by = "Date") %>%
+    full_join(EURGBP %>% select(Date, EURGBP = Value),
+              by = "Date") %>%
+    full_join(EURHKD %>% select(Date, EURHKD = Value),
+              by = "Date") %>%
+    full_join(EURJPY %>% select(Date, EURJPY = Value),
+              by = "Date") %>%
+    full_join(EURNOK %>% select(Date, EURNOK = Value),
+              by = "Date") %>%
+    full_join(EURSEK %>% select(Date, EURSEK = Value),
+              by = "Date") %>%
+    full_join(EURSGD %>% select(Date, EURSGD = Value),
+              by = "Date") %>%
+    full_join(EURUSD %>% select(Date, EURUSD = Value),
+              by = "Date")
+  
+  currencies %>% 
+    arrange(Date) %>% 
+    mutate(AUDCHF = (1/EURAUD)*EURCHF,
+           CADCHF = (1/EURCAD)*EURCHF,
+           GBPCHF = (1/EURGBP)*EURCHF,
+           HKDCHF = (1/EURHKD)*EURCHF,
+           JPYCHF = (1/EURJPY)*EURCHF,
+           NOKCHF = (1/EURNOK)*EURCHF,
+           SEKCHF = (1/EURSEK)*EURCHF,
+           SGDCHF = (1/EURSGD)*EURCHF,
+           USDCHF = (1/EURUSD)*EURCHF)
 }
 
 

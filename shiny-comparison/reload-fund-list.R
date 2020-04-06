@@ -1,7 +1,7 @@
 fundlist <- readRDS("data/fundlist.RDS")
 
 # get data from YH and SIX
-for (i in 1940:nrow(fundlist)) {
+for (i in 700:nrow(fundlist)) {
   
   print(i)
   
@@ -32,6 +32,7 @@ for (i in 1:nrow(fundlist)) {
   fundlist[i, "prices_nrow"] = nrow(prices)
   fundlist[i, "prices_min_date"] = suppressWarnings(min(prices$date, na.rm = T))
   fundlist[i, "prices_max_date"] = suppressWarnings(max(prices$date, na.rm = T))
+  fundlist[i, "prices_currency"] = suppressWarnings(max(prices$currency, ""))
 
   fundlist[i, "holdings_nrow"] = nrow(holdings)
   
