@@ -281,6 +281,32 @@ get_six_dividends_cache <- function(ISIN, currency = "CHF", category = "funds",
   return(out)
 }
 
+get_six_prices <- function(ISIN, currency = "CHF") {
+  
+  url <- paste0("https://www.six-group.com/itf/fqs/delayed/charts.json?select=ISIN,ClosingPrice,ClosingPerformance,PreviousClosingPrice&where=ValorId=",
+                ISIN, currency,
+                "4&columns=Date,Time,Close,Open,Low,High,TotalVolume&fromdate=19880630&netting=1440") # netting=1440 is equal to 1d (1440 minutes = 24 hours)
+  
+  json <- jsonlite::fromJSON(url)
+  
+  # json %>% str()
+  
+  out <- lapply(json$valors$data, FUN = unlist) %>% 
+    as_tibble() %>% 
+    mutate(Date = ymd(Date),
+           Close = as.double(Close),
+           Open = as.double(Open),
+           Low = as.double(Low),
+           High = as.double(High),
+           TotalVolume = as.double(TotalVolume))
+  
+  out
+}
+
+get_six_prices_cache <- function() {
+  # to be completed
+}
+
 get_holdings <- function(symbol) {
   url <- paste0("https://finance.yahoo.com/quote/", symbol, "/holdings")
   
@@ -326,6 +352,25 @@ get_holdings_cache <- function(symbol,
     saveRDS(paste0(cache_dir, symbol, ".RDS"))
   
   return(out)
+}
+
+get_net_assets <- function(symbol) {
+  url <- paste0("https://finance.yahoo.com/quote/", symbol, "/profile?p=", symbol)
+  
+  html <- read_html(url)
+  
+  out <- html %>% 
+    html_nodes(".Pt\\(10px\\)") %>% 
+    html_text() %>% 
+    .[which(str_detect(., "^Net Assets"))] %>% 
+    str_remove("Net Assets")
+  
+  if (is_empty(out)) {
+    out <- ""
+  }
+  out <- out %>% str_c(collapse = " ")
+  
+  out
 }
 
 reload_fundlist <- function() {
