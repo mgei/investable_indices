@@ -434,7 +434,7 @@ reload_quandle_exchangerates <- function(quandl_key = read_file("data/quandl.key
     full_join(EURUSD %>% select(Date, EURUSD = Value),
               by = "Date")
   
-  currencies %>% 
+  currencies <- currencies %>% 
     arrange(Date) %>% 
     mutate(AUDCHF = (1/EURAUD)*EURCHF,
            CADCHF = (1/EURCAD)*EURCHF,
@@ -444,7 +444,12 @@ reload_quandle_exchangerates <- function(quandl_key = read_file("data/quandl.key
            NOKCHF = (1/EURNOK)*EURCHF,
            SEKCHF = (1/EURSEK)*EURCHF,
            SGDCHF = (1/EURSGD)*EURCHF,
-           USDCHF = (1/EURUSD)*EURCHF)
+           USDCHF = (1/EURUSD)*EURCHF) %>% 
+    pivot_longer(-Date)
+    
+  currencies %>% 
+    saveRDS("data/currencies.RDS")
+  
 }
 
 
