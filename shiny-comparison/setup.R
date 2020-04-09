@@ -288,7 +288,6 @@ get_six_prices <- function(ISIN, currency = "CHF") {
                 "4&columns=Date,Time,Close,Open,Low,High,TotalVolume&fromdate=19880630&netting=1440") # netting=1440 is equal to 1d (1440 minutes = 24 hours)
   
   json <- jsonlite::fromJSON(url)
-  
   # json %>% str()
   
   out <- lapply(json$valors$data, FUN = unlist) %>% 
@@ -300,11 +299,41 @@ get_six_prices <- function(ISIN, currency = "CHF") {
            High = as.double(High),
            TotalVolume = as.double(TotalVolume))
   
-  out
+  return(out)
 }
 
-get_six_prices_cache <- function() {
-  # to be completed
+get_six_prices_cache <- function(ISIN, currency = "CHF",
+                                 reload_if_older_than = "1 month",
+                                 cache_dir = "data/cache_six_prices/") {
+  
+  if (paste0(ISIN, "_", currency, ".RDS") %in% list.files(cache_dir)) {
+    cached <- readRDS(paste0(cache_dir, ISIN, "_", currency, ".RDS"))
+    
+    if (cached$loaddate + period(reload_if_older_than) >= Sys.Date()) {
+      out <- cached$data
+      
+      return(out)
+    }
+  }
+  
+  # get from SIX
+  print("get prices from six")
+  suppressWarnings(out <- get_six_prices(ISIN, currency))
+  
+  if (!is_tibble(out)) {
+    return(NA)
+    stop("no data available")
+  }
+
+  # out <- out %>% 
+  #   mutate(ISIN = ISIN)
+  
+  # save to cached files
+  list(loaddate = Sys.Date(),
+       data = out) %>% 
+    saveRDS(paste0(cache_dir, ISIN, "_", currency, ".RDS"))
+  
+  return(out)
 }
 
 get_holdings <- function(symbol) {
