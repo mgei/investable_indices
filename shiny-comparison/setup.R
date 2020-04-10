@@ -297,7 +297,8 @@ get_six_prices <- function(ISIN, currency = "CHF") {
            Open = as.double(Open),
            Low = as.double(Low),
            High = as.double(High),
-           TotalVolume = as.double(TotalVolume))
+           TotalVolume = as.double(TotalVolume),
+           ISIN = ISIN)
   
   return(out)
 }
@@ -402,10 +403,74 @@ get_net_assets <- function(symbol) {
   out
 }
 
-reload_fundlist <- function() {
+get_exchange_rate <- function(cur1, cur2, 
+                              quandl_key = read_file("data/quandl.key")) {
+  Quandl.api_key(quandl_key)
+  
+  if (cur1 == "EUR") {
+    out <- Quandl(paste0("ECB/", cur1, cur2), start_date="2000-01-01") %>% 
+      as_tibble()
+    return(out %>% rename(!!paste0(cur1, cur2) := 2))
+  }
+  if (cur2 == "EUR") {
+    out <- Quandl(paste0("ECB/", cur2, cur1), start_date="2000-01-01") %>% 
+      as_tibble()
+    
+    out <- out %>% 
+      mutate(Value = 1/Value)
+    
+    return(out %>% rename(!!paste0(cur2, cur1) := 2))
+  }
+  
+  EURcur1 <- Quandl(paste0("ECB/EUR", cur1))
+  EURcur2 <- Quandl(paste0("ECB/EUR", cur2))
+  
+  currencies <- left_join(EURcur1 %>% rename(EURcur1 = 2), 
+                          EURcur2 %>% rename(EURcur2 = 2),
+                          by = "Date") %>% 
+    as_tibble()
+  
+  out <- currencies %>% 
+    mutate(!!paste0(cur1, cur2) := 1/EURcur1 * EURcur2) %>% 
+    select(-EURcur1, -EURcur2)
+  
+  return(out)
+}
+ 
+get_exchange_rate_cache <- function(cur1, cur2, quandl_key = read_file("data/quandl.key"),
+                                    reload_if_older_than = "1 week", cache_dir = "data/cache_exchangerates/") {
+  
+  if (paste0(cur1, cur2, ".RDS") %in% list.files(cache_dir)) {
+    cached <- readRDS(paste0(cache_dir, cur1, cur2, ".RDS"))
+    
+    if (cached$loaddate + period(reload_if_older_than) >= Sys.Date()) {
+      out <- cached$data
+      
+      return(out)
+    }
+  }
+  
+  # get from Quandl
+  print("get rates from Quandl")
+  suppressWarnings(out <- get_exchange_rate(cur1, cur2))
+  
+  if (!is_tibble(out)) {
+    out <- tibble(Date = Sys.Date(), !!paste0(cur1, cur2) := NA_real_) %>% 
+      filter(F)
+  }
+  
+  # save to cached files
+  list(loaddate = Sys.Date(),
+       data = out) %>% 
+    saveRDS(paste0(cache_dir, cur1, cur2, ".RDS"))
+  
+  return(out)
+}
+
+reload_fundlist <- function(path = "data/fundlist.RDS") {
   url <- "https://www.six-group.com/exchanges/funds/explorer_export_en.xls"
   GET(url, write_disk("data/fundlist.xls", overwrite = T))
-  fundlist <- read_xls("data/temp.xls", skip = 4)
+  fundlist <- read_xls("data/fundlist.xls", skip = 4)
   
   fundlist <- fundlist %>% 
     mutate(`Management fee` = as.double(`Management fee`),
@@ -486,7 +551,6 @@ reload_quandle_exchangerates <- function(quandl_key = read_file("data/quandl.key
   EURSEK <- Quandl("ECB/EURSEK", start_date="2000-01-01") %>% as_tibble()
   EURSGD <- Quandl("ECB/EURSGD", start_date="2000-01-01") %>% as_tibble()
   EURUSD <- Quandl("ECB/EURUSD", start_date="2000-01-01") %>% as_tibble()
-  
   
   currencies <- EURCHF %>% select(Date, EURCHF = Value) %>%
     full_join(EURAUD %>% select(Date, EURAUD = Value),

@@ -1,0 +1,228 @@
+---
+title: "Auswahl ETF"
+author: "Martin Geissmann"
+date: "9 April 2020"
+output: pdf_document
+classoption: a4paper
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, warning = F, message = F)
+```
+
+```{r packages, echo=F}
+
+source("../shiny-comparison/setup.R")
+
+library(ggalluvial)
+library(ggrepel)
+
+# # reload fundlist
+# fundlist <- reload_fundlist()
+
+fundlist <- readRDS("data/fundlist.RDS")
+
+```
+
+# ETF List
+
+`r nrow(fundlist) %>% number(big.mark = "'") ` ETFs und Funds sind per dato gelistet bei SIX. Link: https://www.six-group.com/exchanges/funds/explorer_en.html#srtBy=FundLongName&savedHash=true
+
+```{r symbols, fig.height= 12}
+
+fundlist %>%
+  select(ISIN, `Product provider`, Issuer, `Trading currency`, `Replication method`, `Management style`, `Product type`,
+         `Asset class`, `Investment region`, `Domicile of fund`) %>%
+  pivot_longer(-ISIN) %>%
+  select(-ISIN) %>%
+  group_by(name, value) %>%
+  count() %>%
+  group_by(name) %>%
+  mutate(value = if_else(value %in% top_n(., 5, n)$value, str_sub(value, 1, 25), "(other)")) %>%
+  group_by(name, value) %>%
+  summarise(n = sum(n)) %>%
+  mutate(n_frac = n/sum(n)) %>%
+  ggplot(aes(x = reorder(value, desc(interaction(name, n_frac))), y = n_frac)) +
+  geom_col(aes(fill = name, alpha = 0.8)) +
+  geom_text(aes(label = paste0(number(n, big.mark = "'"), "\n(", percent(n_frac), ")")), nudge_y = 0.03, size = 3) + # , size = 2
+  scale_y_continuous(labels = percent) +
+  labs(x = "", y = "Anteil an Produkten") +
+  facet_wrap(~name, scales = "free_x") +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+        legend.position = "none")
+
+# mtcars %>% 
+#   ggplot(aes(x = mpg, y = cyl)) +
+#   geom_point()
+  
+  
+```
+
+## Klassierung
+
+```{r klassierung}
+
+fundlist %>% 
+  group_by(`Product type`, `Management style`, `Asset class`, `Investment region`) %>% 
+  count() %>% 
+  ggplot(aes(y = n, axis4 = `Product type`, axis3 = reorder(`Management style`, desc(`Management style`)), axis2 = `Asset class`, axis1 = `Investment region`)) +
+  geom_flow(width = 1/4, aes(fill = `Asset class`), knot.pos = 1/12, size = 0.1, color = "black", alpha = 0.5) +
+  geom_stratum(width = 1/4, fill = "grey90", color = "black") +
+  geom_text(stat = "stratum", infer.label = TRUE, alpha = 0.5, size = 3) +
+  theme(legend.position = "none") +
+  scale_alpha_discrete(range = c(0.1, 1)) +
+  coord_flip()
+
+```
+
+```{r klassierung1}
+
+fundlist_spec <- fundlist %>% 
+  filter(`Product type` == "Exchange Traded Funds") %>% 
+  mutate(Speciality = case_when(str_detect(Name, "Momentum") ~ "Momentum",
+                                str_detect(Name, "Value") ~ "Value",
+                                str_detect(Name, "Treasury|TREASURY") ~ "Treasury",
+                                str_detect(Name, "Low Vol") ~ "Low Volatility",
+                                str_detect(Name, "Dividend") ~ "Dividend",
+                                str_detect(Name, "Blockchain") ~ "Blockchain",
+                                str_detect(Name, "Health Care") ~"Health Care",
+                                str_detect(Name, "Biotech") ~"Biotech",
+                                str_detect(Name, "High Yield") ~ "High Yield",
+                                str_detect(Name, "Inflation") ~ "Inflation",
+                                str_detect(Name, "Digital") ~ "Digital",
+                                str_detect(Name, "Multifactor") ~ "Multifactor",
+                                str_detect(Name, "Private Equity") ~ "Private Equity",
+                                str_detect(Name, "Gold") & !str_detect(Name, "Goldman")  ~ "Gold",
+                                T ~ NA_character_))
+  
+fundlist_spec %>% group_by(`Asset class`) %>% 
+  count()
+  
+fundlist_spec %>% 
+  filter(is.na(Speciality)) %>% 
+  select(Name, `Asset class`, `Investment region`)
+
+```
+
+# Ausgewählte ETF
+
+## Momentum
+
+```{r momentum1}
+momentum <- fundlist %>% 
+  filter(str_detect(Name, "Momentum"))
+
+# momentum$ISIN[1]
+# momentum$`Trading currency`[1]
+
+momentum_prices <- tibble()
+for (i in 1:nrow(momentum)) {
+  momentum_prices <- bind_rows(momentum_prices,
+                               get_six_prices_cache(ISIN = momentum$ISIN[i],
+                                                    currency = momentum$`Trading currency`[i],
+                                                    cache_dir = "../shiny-comparison/data/cache_six_prices/"))
+}
+
+momentum_prices %>% 
+  filter(Date >= as.Date("2017-04-01")) %>%
+  group_by(ISIN) %>% 
+  mutate(performance = Close/first(Close)) %>% 
+  ggplot(aes(x = Date, y = performance,  color = ISIN)) +
+  geom_line()
+```
+
+```{r momentum2}
+
+momentum_returns <- momentum_prices %>% 
+  group_by(ISIN) %>%
+  tq_transmute(select     = Close, 
+               mutate_fun = periodReturn, 
+               period     = "monthly",
+               type       = "arithmetic",
+               col_rename = "Ra")
+
+momentum_returns %>% 
+  ggplot(aes(x = Ra)) + 
+  geom_histogram() +
+  facet_wrap(~ISIN)
+
+```
+
+```{r momentum3}
+
+ret <- momentum_returns %>% 
+  group_by(ISIN, year = year(Date)) %>% 
+  filter(n() == 12 | year == 2020) %>% 
+  tq_performance(Ra = Ra, Rb = NULL, 
+                 performance_fun = Return.annualized)
+
+sd <- momentum_returns %>% 
+  group_by(ISIN, year = year(Date)) %>% 
+  filter(n() == 12 | year == 2020) %>% 
+  tq_performance(Ra = Ra, Rb = NULL, 
+                 performance_fun = sd.annualized)
+
+sr <- momentum_returns %>% 
+  group_by(ISIN, year = year(Date)) %>% 
+  filter(n() == 12 | year == 2020) %>% 
+  tq_performance(Ra = Ra, Rb = NULL, 
+                 performance_fun = SharpeRatio.annualized)
+
+ret %>% 
+  left_join(sd, by = c("ISIN", "year")) %>% 
+  left_join(sr, by = c("ISIN", "year")) %>% 
+  ggplot(aes(y = AnnualizedReturn, x = AnnualizedStandardDeviation, color = ISIN, shape = factor(year))) + 
+  geom_point()
+```
+
+```{r momentum4}
+
+data <- tibble()
+for (y in min(year(momentum_returns$Date)):max(year(momentum_returns$Date))) {
+  precomp <- momentum_returns %>% 
+    filter(year(Date) >= y) %>% 
+    group_by(ISIN, year = year(Date)) %>% 
+    filter(n() == 12 | year == 2020) %>% 
+    group_by(ISIN) %>% 
+    filter(min(year(Date)) <= y)
+  
+  if (nrow(precomp) == 0) {
+    next
+  }
+    
+  ret <- precomp %>% 
+    tq_performance(Ra = Ra, Rb = NULL, 
+                   performance_fun = Return.annualized)
+
+  sd <- precomp %>% 
+    tq_performance(Ra = Ra, Rb = NULL, 
+                   performance_fun = sd.annualized)
+  
+  sr <- precomp %>% 
+    tq_performance(Ra = Ra, Rb = NULL, 
+                   performance_fun = SharpeRatio.annualized)
+  
+  data <- data %>% 
+    bind_rows(
+      ret %>% 
+        left_join(sd, by = c("ISIN")) %>% 
+        left_join(sr, by = c("ISIN")) %>% 
+        mutate(year_since = y)
+  )
+}
+
+data %>% 
+  ggplot(aes(y = AnnualizedReturn, x = AnnualizedStandardDeviation, color = ISIN)) + 
+  geom_point() +
+  geom_text_repel(aes(label = number(`AnnualizedSharpeRatio(Rf=0%)`, accuracy = 0.001))) +
+  facet_wrap(~year_since)
+```
+
+```{r momentum5}
+
+data %>% 
+  pivot_longer(names_to = "key", values_to = "value", -c("ISIN", "year_since")) %>% 
+  pivot_wider(id_cols = c("ISIN", "key"), names_from = year_since, values_from = value)
+
+```
+
