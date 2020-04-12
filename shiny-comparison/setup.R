@@ -6,6 +6,7 @@ library(shiny)
 # library(argonDash)
 library(shinydashboard)
 library(tidyverse)
+library(ggrepel)
 library(tidyquant)
 library(lubridate)
 library(shinyWidgets)
@@ -18,8 +19,9 @@ library(DT)
 library(magrittr)
 library(scales)
 library(Quandl)
+library(RcppRoll)
 
-
+widget_size <- "xs"  #"normal" # sm" # "xs"
 
 ## functions ----
 
@@ -318,7 +320,7 @@ get_six_prices_cache <- function(ISIN, currency = "CHF",
   }
   
   # get from SIX
-  print("get prices from six")
+  print(paste0("get prices from six (", ISIN, " ", currency, ")"))
   suppressWarnings(out <- get_six_prices(ISIN, currency))
   
   if (!is_tibble(out)) {
@@ -538,6 +540,61 @@ reload_six_benchmark <- function() {
   return(benchmarks)
 }
 
+get_six_index <- function(index = "SMI") {
+  if (index == "SMI" | index == "SMIC") {
+    url <- "https://www.six-group.com/exchanges/downloads/indexdata/hsmi.csv"
+  } else if (index == "SXGE") {
+    url <- "https://www.six-group.com/exchanges/downloads/indexdata/hspitr.csv"
+  } else if (index == "SPIX") {
+    url <- "https://www.six-group.com/exchanges/downloads/indexdata/hspipr.csv"
+  } else {
+    return(tibble())
+  }
+  
+  suppressWarnings(suppressMessages(data <- read_delim(url, skip = 1, delim = ";")))
+  
+  out <- data[-1:-4, ] %>% 
+    dplyr::rename(Date = SYMBOL) %>% 
+    mutate(Date = as.Date(Date, "%d.%m.%Y")) %>% 
+    mutate_if(is.character, as.numeric) %>% 
+    select(Date, all_of(index)) %>% 
+    arrange(Date)
+  
+  return(out)
+}
+
+get_six_index_cache <- function(index = "SMI",
+                                reload_if_older_than = "1 month",
+                                cache_dir = "data/cache_index/") {
+  
+  if (paste0(index, ".RDS") %in% list.files(cache_dir)) {
+    cached <- readRDS(paste0(cache_dir, index, ".RDS"))
+    
+    if (cached$loaddate + period(reload_if_older_than) >= Sys.Date()) {
+      out <- cached$data
+      
+      return(out)
+    }
+  }
+  
+  # get from SIX
+  print("get index from six")
+  suppressWarnings(out <- get_six_index(index))
+  
+  if (!is_tibble(out)) {
+    return(NA)
+    stop("no data available")
+  }
+  
+  # save to cached files
+  list(loaddate = Sys.Date(),
+       data = out) %>% 
+    saveRDS(paste0(cache_dir, index, ".RDS"))
+  
+  return(out)
+  
+}
+
 reload_quandle_exchangerates <- function(quandl_key = read_file("data/quandl.key")) {
   Quandl.api_key(quandl_key)
   
@@ -619,7 +676,7 @@ onRenderRebaseTxt <- "
 plot_exception <-function(
   ...,
   sep=" ",
-  type=c("message","warning","cat","print"),
+  type=c("message","warning","cat","print", "none"),
   color="auto",
   console=TRUE,
   size = 6){      
