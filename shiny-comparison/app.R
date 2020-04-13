@@ -307,6 +307,7 @@ server <- function(input, output, session) {
       
       out <- list(ISIN = f[["ISIN"]],
                   TradingCurrency = f[["Trading currency"]],
+                  Symbol = f[["Symbol"]],
                   prices = prices,
                   pricesCHF = pricesCHF,
                   returnsCHF = returnsCHF,
@@ -760,20 +761,22 @@ server <- function(input, output, session) {
   
   ## 2.9. external links ----
   output$external_links <- renderUI({
-    yahoo_link <- a("Yahoo Finance", 
-                    href="https://finance.yahoo.com/quote/AAPL",
+    if (!is_empty(fund_selected_reactive())) {
+      yahoo_link <- a("Yahoo Finance", 
+                      href = paste0("https://finance.yahoo.com/quote/", fund_selected_reactive()$Symbol, ".SW"),
+                      target="_blank")
+      six_link <- a("SIX Swiss Exchange", 
+                    href = paste0("https://www.six-group.com/exchanges/funds/security_info_en.html?id=", 
+                                  fund_selected_reactive()$ISIN, fund_selected_reactive()$TradingCurrency, "4"),
                     target="_blank")
-    six_link <- a("SIX Swiss Exchange", 
-                  href = "https://www.six-group.com/exchanges/funds/security_info_en.html?id=CH0047533549USD4",
-                  target="_blank")
-    
-    tagList(strong("Direktlinks:"),
-            br(),
-            yahoo_link,
-            br(),
-            six_link)
-  }) 
-  
+      
+      tagList(strong("Direktlinks:"),
+              br(),
+              yahoo_link,
+              br(),
+              six_link)
+    }
+  })
 }
 
 shinyApp(ui, server)
