@@ -93,12 +93,13 @@ ui <- fluidPage(
     ),
   ## 1.3. third row ----
   fluidRow(
-    column(2,
-           hr(),
-           uiOutput("external_links")
+    column(2
            ),
-    column(6,
-           tableOutput("performance_table"))
+    column(7,
+           dataTableOutput("performance_table")),
+    column(3, 
+           div(style = "margin-top:50px"),
+           plotOutput("drawdowns_plot"))
   )),
   column(2,
          tableOutput("details_table"),
@@ -108,7 +109,10 @@ ui <- fluidPage(
          div(style = "margin-top:-10px"),
          tableOutput("stats_table"),
          hr(),
-         tableOutput("dividends_table"))
+         tableOutput("dividends_table"),
+         hr(),
+         uiOutput("external_links")
+  )
 )
   
 # 2. server ----
@@ -419,7 +423,7 @@ server <- function(input, output, session) {
   ## 2.1. list of funds ----
   output$fund_list_dt <- renderDataTable({
    fund_list_reactive() %>%
-     list_funds()
+     list_funds(fontsize = fontsize)
    }, server = F)
   
   ## 2.1.a. list of funds fulltext search ----
@@ -735,21 +739,24 @@ server <- function(input, output, session) {
   # })
   
   ## 2.8. performance table ----
-  output$performance_table <- renderTable({
+  output$performance_table <- renderDataTable({
     returnsCHF <- fund_selected_reactive()$returnsCHF
-    
-    # comparison_index_reactive() %>% saveRDS("comparison.RDS")
     
     if (!is.null(returnsCHF)) {
       comparison <- comparison_index_reactive()
+      cap_year <- (year(Sys.Date())-10)
       if (!is.null(comparison)) {
         if (nrow(comparison) > 0) {
           returnsCHF <- bind_rows(returnsCHF,
-                                  comparison %>% filter(Date >= min(returnsCHF$Date)))
+                                  comparison %>% 
+                                    filter(Date >= min(returnsCHF$Date),
+                                           year(Date) >= cap_year) %>% 
+                                    mutate(type = "index"))
         }
       }
       
       performance_years <- returnsCHF %>% 
+        filter(year(Date) >= cap_year) %>%
         group_by(ISIN, 
                  year = year(Date) %>% as.character()) %>% 
         summarise(Return = prod(1+Ra)-1, 
@@ -769,18 +776,19 @@ server <- function(input, output, session) {
                   Dividendyield = sum(Value, na.rm = T)/last(Close)) %>% 
         mutate(year = "12Mte")
       
-      performance_years %>% print()
-      performance_12months %>% print()
-      
-      bind_rows(performance_years,
+      x <- bind_rows(performance_years,
                 performance_12months) %>% 
         ungroup() %>% 
         pivot_longer(names_to = "n", values_to = "v", -c("year", "ISIN")) %>%
-        pivot_wider(names_from = year, values_from = v) %>% 
-        mutate_if(is.numeric, percent, accuracy = 0.1) %>% 
-        dplyr::rename(" " = 1)
+        pivot_wider(names_from = year, values_from = v)
+      
+      bind_rows(x %>% filter(ISIN == fund_selected_reactive()$ISIN, n != "SharpeRatio") %>% mutate_if(is.numeric, percent, accuracy = 0.1),
+                x %>% filter(n == "SharpeRatio") %>% mutate_if(is.numeric, number, accuracy = 0.01)) %>% 
+        dplyr::rename(" " = 1) %>% 
+        datatable(options = list(dom = 't', ordering = F),
+                  rownames = F)
     }
-  }, colnames = T, spacing = "xs", hover = T)
+  })
   
   ## 2.9. external links ----
   output$external_links <- renderUI({
@@ -793,13 +801,44 @@ server <- function(input, output, session) {
                                   fund_selected_reactive()$ISIN, fund_selected_reactive()$TradingCurrency, "4"),
                     target="_blank")
       
+      nzz_link <- a("NZZ The Market", 
+                    href = paste0("https://themarket.nzz.ch/suche/alle/", 
+                                  fund_selected_reactive()$ISIN),
+                    target="_blank")
+      
+      cash_link <- a("Cash.ch",
+                     href = paste0("https://www.cash.ch/suche/alle/",
+                                   fund_selected_reactive()$ISIN),
+                     target="_blank")
+      
       tagList(strong("Direktlinks:"),
               br(),
               yahoo_link,
               br(),
-              six_link)
+              six_link,
+              br(),
+              nzz_link,
+              br(),
+              cash_link)
     }
   })
+  
+  ## 2.10. drawdowns plot ----
+  output$drawdowns_plot <- renderPlot({
+    returnsCHF <- fund_selected_reactive()$returnsCHF
+    
+    if (!is.null(returnsCHF)) {
+      returnsCHF %>% 
+        filter(!is.na(RaTR)) %>% 
+        mutate(drawdown = calc_drawdown(Ra)) %>% 
+        ggplot(aes(x = Date, y = drawdown)) +
+        geom_line(color = "red") +
+        scale_x_date(date_labels = "%m.%y") +
+        scale_y_continuous(labels = percent) +
+        labs(x = "", y = "drawdown") +
+        theme_bw()
+    }
+  }, height = 200L)
 }
 
 shinyApp(ui, server)

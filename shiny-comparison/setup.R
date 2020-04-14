@@ -21,7 +21,8 @@ library(scales)
 library(Quandl)
 library(RcppRoll)
 
-widget_size <- "xs"  #"normal" # sm" # "xs"
+widget_size <- "normal"  #"normal" # sm" # "xs"
+fontsize <- "100%" # 80%
 
 ## functions ----
 
@@ -699,7 +700,7 @@ plot_exception <-function(
 
 ## datatable helper
 
-list_funds <- function(data, filter = F, searching = F,
+list_funds <- function(data, filter = F, searching = F, fontsize = "100%",
                        visible_cols = c("Name", "ISIN", "Symbol", "Issuer", "Trading currency", "Management fee", "Investment region")) {
   
   if (filter) {
@@ -717,8 +718,17 @@ list_funds <- function(data, filter = F, searching = F,
                              search = list(search = 'CHF')), 
               selection = "single", class = 'compact cell-border') %>%
       formatString(suffix = "%", columns = "Management fee") %>% 
-      formatStyle(columns = 1:37, fontSize = '80%')
+      formatStyle(columns = 1:37, fontSize = fontsize)
+}
 
+calc_drawdown <- function(Ra) {
+  # same calculation formula as PerformanceAnalytics::Drawdowns geometric = FALSE
+  
+  p <- 1 + cumsum(Ra)
+  m <- cummax(c(1, p))[-1]
+  d <- p/m - 1
+  
+  return(d)
 }
 
 
