@@ -379,10 +379,6 @@ server <- function(input, output, session) {
   
   ## 2.0.4. comparison index ----
   comparison_index_reactive <- reactive({
-    # req(input$comparison_index)
-    
-    # input$comparison_index %>% print()
-    
     out <- tibble()
     if ("SMI" %in% input$comparison_index) {
       smi <- get_six_index_cache("SMI") %>% 
@@ -407,7 +403,15 @@ server <- function(input, output, session) {
       out <- bind_rows(out, 
                        spi, 
                        spi_tr)
-    } 
+    }
+    
+    out <- out %>% 
+      arrange(ISIN, Date) %>% 
+      group_by(ISIN) %>% 
+      mutate(Close = na.locf(Close),
+             Ra = Close/lag(Close)-1,
+             RaTR = Ra) %>% 
+      ungroup()
     
     out
   })
@@ -453,10 +457,11 @@ server <- function(input, output, session) {
       if (nrow(prices) > 0) {
         
         if (input$performance_price & input$currency_chf) {
-          if (!is.null(comparison_index_reactive())) {
-            if (nrow(comparison_index_reactive()) > 0) {
+          comparison <- comparison_index_reactive()
+          if (!is.null(comparison)) {
+            if (nrow(comparison) > 0) {
               prices <- bind_rows(prices,
-                                  comparison_index_reactive())
+                                  comparison)
             }
           }
         }
@@ -733,26 +738,44 @@ server <- function(input, output, session) {
   output$performance_table <- renderTable({
     returnsCHF <- fund_selected_reactive()$returnsCHF
     
+    # comparison_index_reactive() %>% saveRDS("comparison.RDS")
+    
     if (!is.null(returnsCHF)) {
+      comparison <- comparison_index_reactive()
+      if (!is.null(comparison)) {
+        if (nrow(comparison) > 0) {
+          returnsCHF <- bind_rows(returnsCHF,
+                                  comparison %>% filter(Date >= min(returnsCHF$Date)))
+        }
+      }
+      
       performance_years <- returnsCHF %>% 
-        group_by(year = year(Date) %>% as.character()) %>% 
+        group_by(ISIN, 
+                 year = year(Date) %>% as.character()) %>% 
         summarise(Return = prod(1+Ra)-1, 
                   TotalReturn = prod(1+RaTR)-1, 
-                  Volatility = sd(Ra)*sqrt(250), 
+                  Volatility = sd(Ra)*sqrt(250),
+                  SharpeRatio = TotalReturn/Volatility,
                   Dividendyield = sum(Value, na.rm = T)/last(Close)) %>% 
         filter(!is.na(Return))
       
       performance_12months <- returnsCHF %>% 
         filter(Date >= Sys.Date() - months(12)) %>% 
+        group_by(ISIN) %>% 
         summarise(Return = prod(1+Ra, na.rm = T)-1, 
                   TotalReturn = prod(1+RaTR, na.rm = T)-1, 
-                  Volatility = sd(Ra, na.rm = T)*sqrt(250), 
+                  Volatility = sd(Ra, na.rm = T)*sqrt(250),
+                  SharpeRatio = TotalReturn/Volatility,
                   Dividendyield = sum(Value, na.rm = T)/last(Close)) %>% 
         mutate(year = "12Mte")
       
+      performance_years %>% print()
+      performance_12months %>% print()
+      
       bind_rows(performance_years,
                 performance_12months) %>% 
-        pivot_longer(names_to = "n", values_to = "v", -year) %>%
+        ungroup() %>% 
+        pivot_longer(names_to = "n", values_to = "v", -c("year", "ISIN")) %>%
         pivot_wider(names_from = year, values_from = v) %>% 
         mutate_if(is.numeric, percent, accuracy = 0.1) %>% 
         dplyr::rename(" " = 1)
