@@ -159,6 +159,14 @@ Run *etfs/erfdb_selenium.r*.
 
 ![](./graphs/vorsorgefonds.png)
 
-# Function to get fund or ETF details and dividends from SIX Financial Exchange
+# Function to get fund or ETF details and dividends from SIX Financial Exchange (outdated)
 
 see in *swiss-market/get_six.R*.
+
+outdated: we found a better way to scrape including price data, see functions in *shiny-comparison/setup.R*.
+
+# Shiny ETF and fund compairson application
+
+WIP
+
+![](./graphs/screenshot1.png)
