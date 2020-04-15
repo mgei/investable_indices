@@ -1,0 +1,287 @@
+---
+title: "(Out-)Performance of Funds and ETFs"
+author: "Martin Geissmann"
+date: "15 April 2020"
+output: pdf_document
+classoption: 
+  - a4paper
+  - landscape
+geometry: margin=1.5cm
+---
+
+```{r setup, include=FALSE}
+# `r format(Sys.Date(), "%d %m %Y)`
+
+knitr::opts_chunk$set(echo = F, warning = F, message = F)
+
+source("../shiny-comparison/setup.R")
+
+fundlist <- readRDS("../shiny-comparison/data/fundlist.RDS")
+
+library(kableExtra)
+library(scales)
+
+# number_clean <- function(x, accuracy = NULL, scale = 1, prefix = "", suffix = "",
+#                          big.mark = "'", decimal.mark = ".", trim = TRUE, 
+#                          ...) {
+#   if (is.na(x)) {
+#     return("")
+#   } else {
+#     return(number(x, accuracy, scale, prefix, suffix, big.mark, decimal.mark, trim))
+#   }
+# }
+
+
+format <- "latex"
+
+
+```
+
+```{r preload-data, eval=F}
+for (i in 1:nrow(fundlist)) {
+  print(i)
+  get_six_prices_cache(ISIN = fundlist$ISIN[i],
+                       currency = fundlist$`Trading currency`[i],
+                       cache_dir = "../shiny-comparison/data/cache_six_prices/")
+  
+  get_six_dividends_cache(ISIN = fundlist$ISIN[i],
+                          currency = fundlist$`Trading currency`[i],
+                          cache_dir = "../shiny-comparison/data/cache_dividends/")
+}
+```
+
+```{r calc-SR, eval=F}
+fundlist_SR <- tibble()
+for (i in 1:nrow(fundlist)) {
+  print(i)
+  
+  prices <- get_six_prices_cache(ISIN = fundlist$ISIN[i],
+                                 currency = fundlist$`Trading currency`[i],
+                                 cache_dir = "../shiny-comparison/data/cache_six_prices/") %>% 
+    mutate(Currency = fundlist$`Trading currency`[i])
+  
+  dividends <- get_six_dividends_cache(ISIN = fundlist$ISIN[i],
+                                       currency = fundlist$`Trading currency`[i],
+                                       cache_dir = "../shiny-comparison/data/cache_dividends/")
+  
+  
+  if (prices$Currency[1] != "CHF") {
+    pricesCHF <- prices %>% 
+      left_join(get_exchange_rate_cache(.$Currency[1], "CHF", 
+                                        quandl_key = read_file("../shiny-comparison/data/quandl.key"),
+                                        cache_dir = "../shiny-comparison/data/cache_exchangerates/") %>% dplyr::rename(rate = 2), 
+                by = c("Date")) %>% 
+      mutate(rate = na.locf(rate),
+             Close = Close*rate,
+             Currency = "CHF") %>% 
+      select(-rate)
+  } else {
+    pricesCHF <- prices
+  }
+  
+  if (nrow(dividends) > 0) {
+    if (dividends$Currency[1] != "CHF") {
+      dividendsCHF <- dividends %>% 
+        left_join(get_exchange_rate_cache(.$Currency[1], "CHF", 
+                                          quandl_key = read_file("../shiny-comparison/data/quandl.key"), 
+                                          cache_dir = "../shiny-comparison/data/cache_exchangerates/") %>% 
+                    dplyr::rename(rate = 2), 
+                  by = c("Ex_dividend_date" = "Date")) %>% 
+        arrange(Ex_dividend_date) %>% 
+        mutate(rate = na.locf(rate),
+               Value = Value*rate,
+               Currency = "CHF") %>% 
+        select(-rate)
+    } else {
+      dividendsCHF <- dividends
+    }
+  } else {
+    dividendsCHF <- dividends
+  }
+  
+  returnsCHF <- pricesCHF %>% 
+    filter(Date < as.Date("2020-04-01")) %>% 
+    select(-Currency) %>% 
+    left_join(dividendsCHF %>% select(-ISIN, -Currency), by = c("Date" = "Ex_dividend_date")) %>% 
+    mutate(CloseInclDiv = if_else(!is.na(Value), Close+Value, Close), 
+           Ra = Close/lag(Close) - 1,
+           RaTR = CloseInclDiv/lag(Close) - 1)
+  
+  stats <- returnsCHF %>% 
+    group_by(year = year(Date)) %>% 
+    filter(n() > 220 | year == year(Sys.Date())) %>%
+    summarise(Return = prod(1+Ra)-1, 
+              TotalReturn = prod(1+RaTR)-1, 
+              Volatility = sd(RaTR)*sqrt(250),
+              SharpeRatio = TotalReturn/Volatility) %>% 
+    select(year, SharpeRatio) %>% 
+    pivot_wider(names_from = year, values_from = SharpeRatio)
+  
+  fundlist_SR <- bind_rows(fundlist_SR,
+                           fundlist[i,] %>% bind_cols(stats) %>% mutate(dividends = (nrow(dividendsCHF) > 0)))
+  
+}
+
+fundlist_SR %>% saveRDS("fundlist_SR.RDS")
+```
+
+```{r index, eval = F}
+
+# smi <- get_six_index_cache("SMI", cache_dir = "../shiny-comparison/data/cache_index/")
+smi_tr <- get_six_index_cache("SMIC", cache_dir = "../shiny-comparison/data/cache_index/")
+# spi <- get_six_index_cache("SPIX", cache_dir = "../shiny-comparison/data/cache_index/")
+spi_tr <- get_six_index_cache("SXGE", cache_dir = "../shiny-comparison/data/cache_index/")
+
+index_SR <- smi_tr %>% 
+  left_join(spi_tr, by = "Date") %>% 
+  pivot_longer(names_to = "Index", values_to = "Close", -"Date") %>% 
+  arrange(Index, Date) %>% 
+  group_by(Index) %>% 
+  mutate(RaTR = Close/lag(Close)-1) %>% 
+  filter(Date < as.Date("2020-04-01")) %>% 
+  group_by(Index, year = year(Date)) %>% 
+  summarise(TotalReturn = prod(1+RaTR)-1,
+            Volatility = sd(RaTR)*sqrt(250),
+            SharpeRatio = TotalReturn/Volatility) %>% 
+  select(Index, year, SharpeRatio) %>% 
+  pivot_wider(names_from = year, values_from = SharpeRatio)
+
+index_SR %>% saveRDS("index_SR.RDS")
+
+```
+
+
+```{r loadsaved}
+fundlist_SR <- readRDS("fundlist_SR.RDS")
+index_SR <- readRDS("index_SR.RDS")
+```
+
+```{r available}
+fundlist_SR %>% 
+  group_by(`Management style`, `Asset class`) %>% 
+  count() %>% 
+  ungroup() %>% 
+  pivot_wider(names_from = `Management style`,
+              values_from = n) %>% 
+  mutate_if(is.numeric, number_format(accuracy = 1)) %>% 
+  kable(format = format, booktabs = T, longtable = T) %>%
+  kable_styling(latex_options = c("striped", "hold_position", "repeat_header")) %>% 
+  row_spec(0, bold = T) 
+  # kableExtra::landscape()
+  
+  
+```
+
+# Active Management
+
+```{r kablehelpers}
+spec_color_redgreen <- function(x, midpoint = mean(x), na_color = "#FFFFFF", amount_lighten = 0.2) {
+
+  x <- round(scales::rescale_mid(x, mid = midpoint, to = c(1, 256)))
+  
+  # color_code <- colorRamps::green2red(256)[(256-x)]
+  colors <- colorRamps::green2red(256) %>% 
+    colorspace::lighten(amount = amount_lighten)
+  color_code <- colors[(256-x)]
+  color_code[is.na(color_code)] <- na_color
+  return(color_code)
+}
+
+na_white <- function(x) {
+  out <- ifelse(is.na(x), "white", "black")
+  return(out)
+}
+```
+
+## Commodities
+
+
+```{r a_com}
+
+d <- index_SR %>%
+  select(Name = Index, as.character(2010:2020)) %>%
+  bind_rows(fundlist_SR %>% 
+              filter(`Management style` == "active", `Asset class` == "Commodities") %>% 
+              select(Name, as.character(2010:2020)) %>% 
+              rowwise() %>% 
+              mutate(m = mean(c(`2010`, `2011`, `2012`, `2013`, `2014`, `2015`, `2016`, `2017`, `2018`, `2019`, `2020`), na.rm = T)) %>% 
+              arrange(desc(m)) %>% 
+              select(-m))
+
+d %>%
+  ungroup() %>% 
+  mutate(Name = cell_spec(Name, format = format),
+         `2010` = cell_spec(round(`2010`, digits = 1), format = format, 
+                            color = na_white(`2010`), background = spec_color_redgreen(`2010`, midpoint = .$`2010`[1])),
+         `2011` = cell_spec(round(`2011`, digits = 1), format = format, 
+                            color = na_white(`2011`), background = spec_color_redgreen(`2011`, midpoint = .$`2011`[1])),
+         `2012` = cell_spec(round(`2012`, digits = 1), format = format, 
+                            color = na_white(`2012`), background = spec_color_redgreen(`2012`, midpoint = .$`2012`[1])),
+         `2013` = cell_spec(round(`2013`, digits = 1), format = format, 
+                            color = na_white(`2013`), background = spec_color_redgreen(`2013`, midpoint = .$`2013`[1])),
+         `2014` = cell_spec(round(`2014`, digits = 1), format = format, 
+                            color = na_white(`2014`), background = spec_color_redgreen(`2014`, midpoint = .$`2014`[1])),
+         `2015` = cell_spec(round(`2015`, digits = 1), format = format, 
+                            color = na_white(`2015`), background = spec_color_redgreen(`2015`, midpoint = .$`2015`[1])),
+         `2016` = cell_spec(round(`2016`, digits = 1), format = format, 
+                            color = na_white(`2016`), background = spec_color_redgreen(`2016`, midpoint = .$`2016`[1])),
+         `2017` = cell_spec(round(`2017`, digits = 1), format = format, 
+                            color = na_white(`2017`), background = spec_color_redgreen(`2017`, midpoint = .$`2017`[1])),
+         `2018` = cell_spec(round(`2018`, digits = 1), format = format, 
+                            color = na_white(`2018`), background = spec_color_redgreen(`2018`, midpoint = .$`2018`[1])),
+         `2019` = cell_spec(round(`2019`, digits = 1), format = format, 
+                            color = na_white(`2019`), background = spec_color_redgreen(`2019`, midpoint = .$`2019`[1])),
+         `2020` = cell_spec(round(`2020`, digits = 1), format = format, 
+                            color = na_white(`2020`), background = spec_color_redgreen(`2020`, midpoint = .$`2020`[1]))) %>%
+  filter(row_number() != 1:2) %>% 
+  kable(format = format, booktabs = T, longtable = T, escape = F) %>%
+  kable_styling(latex_options = c("hold_position", "repeat_header")) %>% # "striped", 
+  row_spec(0, bold = T)
+
+```
+
+## Equity Developed Markets
+
+```{r a_edm}
+
+d <- index_SR %>%
+  select(Name = Index, as.character(2010:2020)) %>%
+  bind_rows(fundlist_SR %>% 
+              filter(`Management style` == "active", `Asset class` == "Equity Developed Markets") %>% 
+              select(Name, as.character(2010:2020)) %>% 
+              rowwise() %>% 
+              mutate(m = mean(c(`2010`, `2011`, `2012`, `2013`, `2014`, `2015`, `2016`, `2017`, `2018`, `2019`, `2020`), na.rm = T)) %>% 
+              arrange(desc(m)) %>% 
+              select(-m))
+
+d %>%
+  ungroup() %>% 
+  mutate(Name = cell_spec(Name, format = format),
+         `2010` = cell_spec(round(`2010`, digits = 1), format = format, 
+                            color = na_white(`2010`), background = spec_color_redgreen(`2010`, midpoint = .$`2010`[1])),
+         `2011` = cell_spec(round(`2011`, digits = 1), format = format, 
+                            color = na_white(`2011`), background = spec_color_redgreen(`2011`, midpoint = .$`2011`[1])),
+         `2012` = cell_spec(round(`2012`, digits = 1), format = format, 
+                            color = na_white(`2012`), background = spec_color_redgreen(`2012`, midpoint = .$`2012`[1])),
+         `2013` = cell_spec(round(`2013`, digits = 1), format = format, 
+                            color = na_white(`2013`), background = spec_color_redgreen(`2013`, midpoint = .$`2013`[1])),
+         `2014` = cell_spec(round(`2014`, digits = 1), format = format, 
+                            color = na_white(`2014`), background = spec_color_redgreen(`2014`, midpoint = .$`2014`[1])),
+         `2015` = cell_spec(round(`2015`, digits = 1), format = format, 
+                            color = na_white(`2015`), background = spec_color_redgreen(`2015`, midpoint = .$`2015`[1])),
+         `2016` = cell_spec(round(`2016`, digits = 1), format = format, 
+                            color = na_white(`2016`), background = spec_color_redgreen(`2016`, midpoint = .$`2016`[1])),
+         `2017` = cell_spec(round(`2017`, digits = 1), format = format, 
+                            color = na_white(`2017`), background = spec_color_redgreen(`2017`, midpoint = .$`2017`[1])),
+         `2018` = cell_spec(round(`2018`, digits = 1), format = format, 
+                            color = na_white(`2018`), background = spec_color_redgreen(`2018`, midpoint = .$`2018`[1])),
+         `2019` = cell_spec(round(`2019`, digits = 1), format = format, 
+                            color = na_white(`2019`), background = spec_color_redgreen(`2019`, midpoint = .$`2019`[1])),
+         `2020` = cell_spec(round(`2020`, digits = 1), format = format, 
+                            color = na_white(`2020`), background = spec_color_redgreen(`2020`, midpoint = .$`2020`[1]))) %>%
+  filter(row_number() != 1:2) %>% 
+  kable(format = format, booktabs = T, longtable = T, escape = F) %>%
+  kable_styling(latex_options = c("hold_position", "repeat_header")) %>% # "striped", 
+  row_spec(0, bold = T)
+
+```

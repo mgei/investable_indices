@@ -233,12 +233,14 @@ get_six_dividends <- function(ISIN, currency = "CHF", category = "funds") {
   }
   
   url<-paste0("https://www.six-group.com/exchanges/", category, "/info_details_en.html?id=", ISIN, currency,"4&portalSegment=", category_short)
-  download.file(url, destfile = "data/scrapedpage.html", quiet=TRUE)
+  download.file(url, destfile = "scrapedpage.html", quiet=TRUE)
   
-  D1 <- read_html("data/scrapedpage.html") %>% 
+  D1 <- read_html("scrapedpage.html") %>% 
     html_nodes("table.table-grid") %>%
     html_nodes("td") %>%
     html_text()
+  
+  unlink("scrapedpage.html")
   df <- data.frame(matrix(unlist(D1), ncol=3, byrow=T), stringsAsFactors = F)
   colnames(df) <-c("Ex_dividend_date","Value","Currency")
   df <- df[-c(1, 2),]
@@ -455,7 +457,7 @@ get_exchange_rate_cache <- function(cur1, cur2, quandl_key = read_file("data/qua
   
   # get from Quandl
   print("get rates from Quandl")
-  suppressWarnings(out <- get_exchange_rate(cur1, cur2))
+  suppressWarnings(out <- get_exchange_rate(cur1, cur2, quandl_key = quandl_key))
   
   if (!is_tibble(out)) {
     out <- tibble(Date = Sys.Date(), !!paste0(cur1, cur2) := NA_real_) %>% 
