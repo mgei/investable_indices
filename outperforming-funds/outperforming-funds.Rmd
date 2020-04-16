@@ -51,7 +51,8 @@ for (i in 1:nrow(fundlist)) {
 ```
 
 ```{r calc-SR, eval=F}
-fundlist_SR <- tibble()
+# fundlist_SR <- tibble()
+stats <- tibble()
 for (i in 1:nrow(fundlist)) {
   print(i)
   
@@ -107,22 +108,58 @@ for (i in 1:nrow(fundlist)) {
            Ra = Close/lag(Close) - 1,
            RaTR = CloseInclDiv/lag(Close) - 1)
   
-  stats <- returnsCHF %>% 
-    group_by(year = year(Date)) %>% 
-    filter(n() > 220 | year == year(Sys.Date())) %>%
+  stats_temp <- returnsCHF %>% 
+    group_by(year = year(Date) %>% as.character()) %>%
+    filter(n() > 240 | year == year(Sys.Date())) %>%
     summarise(Return = prod(1+Ra)-1, 
               TotalReturn = prod(1+RaTR)-1, 
               Volatility = sd(RaTR)*sqrt(250),
               SharpeRatio = TotalReturn/Volatility) %>% 
-    select(year, SharpeRatio) %>% 
-    pivot_wider(names_from = year, values_from = SharpeRatio)
+    pivot_longer(names_to = "field", values_to = "value", -"year")
+    # select(year, SharpeRatio) %>% 
+    # pivot_wider(names_from = year, values_from = SharpeRatio)
   
-  fundlist_SR <- bind_rows(fundlist_SR,
-                           fundlist[i,] %>% bind_cols(stats) %>% mutate(dividends = (nrow(dividendsCHF) > 0)))
+  for (y in unique(stats_temp$year)) {
+    stats_since_temp <- returnsCHF %>% 
+      filter(year(Date) >= y) %>%
+      summarise(Return = prod(1+Ra)-1, 
+                TotalReturn = prod(1+RaTR)-1, 
+                Volatility = sd(RaTR)*sqrt(250),
+                SharpeRatio = TotalReturn/Volatility) %>% 
+      mutate(year = paste("since", y)) %>% 
+      pivot_longer(names_to = "field", values_to = "value", -"year")
+    
+    stats_temp <- stats_temp %>% 
+      bind_rows(stats_since_temp) %>% 
+      mutate(ISIN = fundlist$ISIN[i],
+           `Trading currency` = fundlist$`Trading currency`[i])
+  }
+  
+  stats <- stats %>% 
+      bind_rows(stats_temp)
+  
+  # stats <- returnsCHF %>% 
+  #   group_by(year = year(Date)) %>%
+  #   filter(n() > 240 | year == year(Sys.Date())) %>%
+  #   summarise(Return = prod(1+Ra)-1, 
+  #             TotalReturn = prod(1+RaTR)-1, 
+  #             Volatility = sd(RaTR)*sqrt(250),
+  #             SharpeRatio = TotalReturn/Volatility) %>% 
+  #   pivot_longer(names_to = "field", values_to = "value", -"year")
+  #   # select(year, SharpeRatio) %>% 
+  #   pivot_wider(names_from = year, values_from = SharpeRatio)
+  # 
+  # fundlist_SR <- bind_rows(fundlist_SR,
+  #                          fundlist[i,] %>% bind_cols(stats) %>% mutate(dividends = (nrow(dividendsCHF) > 0)))
   
 }
 
-fundlist_SR %>% saveRDS("fundlist_SR.RDS")
+# fundlist_SR %>% saveRDS("fundlist_SR.RDS")
+
+fundlist_stats_long <- fundlist %>% 
+  left_join(stats, by = c("ISIN", "Trading currency"))
+
+fundlist_stats_long %>% saveRDS("fundlist_stats_long.RDS")
 ```
 
 ```{r index, eval = F}
@@ -144,7 +181,8 @@ index_SR <- smi_tr %>%
             Volatility = sd(RaTR)*sqrt(250),
             SharpeRatio = TotalReturn/Volatility) %>% 
   select(Index, year, SharpeRatio) %>% 
-  pivot_wider(names_from = year, values_from = SharpeRatio)
+  pivot_wider(names_from = year, values_from = SharpeRatio) %>% 
+  ungroup()
 
 index_SR %>% saveRDS("index_SR.RDS")
 
