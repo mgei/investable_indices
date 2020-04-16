@@ -1,0 +1,227 @@
+---
+title: "(Out-)Performance of Funds and ETFs"
+author: "Martin Geissmann"
+date: "15 April 2020"
+output: pdf_document
+classoption: 
+  - a4paper
+geometry: margin=1.5cm
+---
+  
+```{r setup, echo = F, warning=F, message=F}
+
+knitr::opts_chunk$set(echo = F, warning = F, message = F)
+
+source("../shiny-comparison/setup.R")
+
+fundlist <- readRDS("../shiny-comparison/data/fundlist.RDS")
+fundlist_SR <- readRDS("fundlist_SR.RDS")
+
+library(kableExtra)
+library(scales)
+
+```
+
+```{r dataprep, eval = F}
+
+fundlist_dividends <- fundlist_SR %>% 
+  filter(dividends)
+
+fulldata_dividends <- tibble()
+for (i in 1:nrow(fundlist_dividends)) {
+  # print(i)
+  
+  prices <- get_six_prices_cache(ISIN = fundlist_dividends$ISIN[i],
+                                 currency = fundlist_dividends$`Trading currency`[i],
+                                 cache_dir = "../shiny-comparison/data/cache_six_prices/") %>% 
+    mutate(Currency = fundlist_dividends$`Trading currency`[i])
+  
+  dividends <- get_six_dividends_cache(ISIN = fundlist_dividends$ISIN[i],
+                                       currency = fundlist_dividends$`Trading currency`[i],
+                                       cache_dir = "../shiny-comparison/data/cache_dividends/")
+  
+  
+  if (prices$Currency[1] != "CHF") {
+    pricesCHF <- prices %>% 
+      left_join(get_exchange_rate_cache(.$Currency[1], "CHF", 
+                                        quandl_key = read_file("../shiny-comparison/data/quandl.key"),
+                                        cache_dir = "../shiny-comparison/data/cache_exchangerates/") %>% dplyr::rename(rate = 2), 
+                by = c("Date")) %>% 
+      mutate(rate = na.locf(rate),
+             Close = Close*rate,
+             Currency = "CHF") %>% 
+      select(-rate)
+  } else {
+    pricesCHF <- prices
+  }
+  
+  if (nrow(dividends) > 0) {
+    if (dividends$Currency[1] != "CHF") {
+      dividendsCHF <- dividends %>% 
+        left_join(get_exchange_rate_cache(.$Currency[1], "CHF", 
+                                          quandl_key = read_file("../shiny-comparison/data/quandl.key"), 
+                                          cache_dir = "../shiny-comparison/data/cache_exchangerates/") %>% 
+                    dplyr::rename(rate = 2), 
+                  by = c("Ex_dividend_date" = "Date")) %>% 
+        arrange(Ex_dividend_date) %>% 
+        mutate(rate = na.locf(rate),
+               Value = Value*rate,
+               Currency = "CHF") %>% 
+        select(-rate)
+    } else {
+      dividendsCHF <- dividends
+    }
+  } else {
+    dividendsCHF <- dividends
+  }
+  
+  returnsCHF <- pricesCHF %>% 
+    filter(Date < as.Date("2020-04-01")) %>% 
+    select(-Currency) %>% 
+    left_join(dividendsCHF %>% select(-ISIN, -Currency), by = c("Date" = "Ex_dividend_date")) %>% 
+    mutate(Name = fundlist_dividends$Name[i],
+           `Trading currency` = fundlist_dividends$`Trading currency`[i],
+           `Asset class` = fundlist_dividends$`Asset class`[i],
+           `Management style` = fundlist_dividends$`Management style`[i],
+           CloseInclDiv = if_else(!is.na(Value), Close+Value, Close), 
+           Ra = Close/lag(Close) - 1,
+           RaTR = CloseInclDiv/lag(Close) - 1) %>% 
+    select(Name, ISIN, `Trading currency`, `Asset class`, `Management style`, Date, Close, Dividend = Value, CloseInclDiv,
+           Ra, RaTR)
+  
+  fulldata_dividends <- fulldata_dividends %>% 
+    bind_rows(returnsCHF)
+}
+
+fulldata_dividends %>% saveRDS("fulldata_dividends.RDS")
+
+```
+
+```{r loaddata}
+
+fulldata_dividends <- readRDS("fulldata_dividends.RDS")
+
+```
+
+```{r test, eval = F}
+
+min_date <- as.Date("2000-01-01")
+
+fulldata_dividends %>% 
+  group_by(Name, ISIN, `Trading currency`) %>% 
+  filter(any(Date <= min_date))
+
+
+fulldata_dividends %>% 
+  filter(ISIN == "CH0002769351") %>% 
+  group_by(year = year(Date)) %>% 
+  summarise(Dividend = sum(Dividend, na.rm = T),
+            Close = mean(Close, na.rm = T))
+
+
+
+d <- fulldata_dividends %>% 
+  filter(ISIN == "CH0111762537") %>% 
+  pivot_longer(names_to = "type", values_to = "CHF", 
+               cols = -c("Name", "ISIN", "Trading currency", "Date", "CloseInclDiv", "Ra", "RaTR"))
+
+d %>% 
+  ggplot(aes(x = Date)) +
+  geom_line(aes(y = ifelse(type == "Close", CHF, NA_real_))) +
+  geom_point(aes(y = ifelse(type == "Dividend", CHF, NA_real_)), color = "red", size = 4) +
+  geom_label(data = d %>% filter(type == "Dividend") %>% group_by(year = year(Date), type) %>% summarise(Dividende = sum(CHF, na.rm = T)) %>% mutate(Date = ymd(paste(year, 06, 15))),
+             aes(label = number(Dividende, prefix = "CHF ", accuracy = 0.01)), y = 1, size = 2, alpha = 0.5) +
+  geom_vline(xintercept = seq(from = as.Date("1980-01-01"), to = Sys.Date(), by = "years")) +
+  facet_wrap(~type, ncol = 1,
+             scales = "free_y")
+  # geom_point(aes(y = Close, size = Dividend), color = "red") +
+  # geom_text_repel(aes(y = Close, size = Dividend))
+  
+d <- fulldata_dividends %>% 
+  filter(ISIN == "CH0111762537")
+
+d_dividend <- d %>% 
+  filter(!is.na(Dividend)) %>%
+  group_by(year = year(Date)) %>% 
+  summarise(Close = sum(Dividend, na.rm = T)) %>% 
+  mutate(Date = ymd(paste(year, 06, 15)),
+         type = "Dividende")
+
+d %>% 
+  mutate(type = "Aktie") %>% 
+  ggplot(aes(x = Date)) +
+  geom_line(aes(y = Close)) +
+  geom_point(aes(y = Close, size = Dividend>0), color = "red") + 
+  geom_col(data = d_dividend, aes(y = Close)) +
+  geom_label(data = d_dividend, aes(y = Close, label = Close)) +
+  facet_wrap(~type, ncol = 1, scales = "free_y") +
+  scale_x_date(date_labels = "%Y", date_breaks = "1 year") +
+  labs(title = d$Name[1], x = "", y = "") +
+  theme(legend.position = "none")
+
+```
+
+\newpage
+
+
+```{r realestate, results='asis'}
+
+min_date <- as.Date("2005-01-01")
+
+stocks <- fulldata_dividends %>% 
+  filter(`Asset class` == "Equity Developed Markets") %>% 
+  group_by(Name, ISIN, `Trading currency`) %>% 
+  filter(any(Date <= min_date)) %>% 
+  select(Name, ISIN, `Trading currency`) %>% 
+  distinct()
+  
+
+for (i in 1:nrow(stocks)) {
+  d <- fulldata_dividends %>% 
+    filter(ISIN == stocks$ISIN[i],
+           `Trading currency` == stocks$`Trading currency`[i])
+  
+  d_dividend <- d %>% 
+  filter(!is.na(Dividend)) %>%
+  group_by(year = year(Date)) %>% 
+  summarise(Close = sum(Dividend, na.rm = T)) %>% 
+  mutate(Date = ymd(paste(year, 06, 15)),
+         type = "Dividende")
+
+print(d %>% 
+  mutate(type = "Aktie") %>% 
+  ggplot(aes(x = Date)) +
+  geom_line(aes(y = Close)) +
+  geom_point(aes(y = Close, size = Dividend>0), color = "red") + 
+  geom_col(data = d_dividend, aes(y = Close)) +
+  geom_label(data = d_dividend, aes(y = Close, label = round(Close, 2)), size = 3) +
+  facet_wrap(~type, ncol = 1, scales = "free_y") +
+  scale_x_date(date_labels = "%Y", date_breaks = "1 year") +
+  labs(title = d$Name[1], x = "", y = "") +
+  theme(legend.position = "none"))
+
+cat("\n\n")
+
+print(d %>% 
+  mutate(Dividend12 = roll_sum(Dividend, 250, align = "right", fill = NA, na.rm = T),
+         yield = Dividend12/Close) %>% 
+  ggplot(aes(x = Date, y = yield)) +
+  geom_line() +
+  geom_smooth() +
+  scale_y_continuous(labels = percent,
+                     breaks = seq(0, 2, by = 0.01)) +
+  scale_x_date(date_labels = "%Y", date_breaks = "1 year") +
+  labs(title = d$Name[1], x = "", y = "") +
+  theme(legend.position = "none"))
+
+cat("\n\n")
+}
+
+```
+
+
+
+
+
+
+
