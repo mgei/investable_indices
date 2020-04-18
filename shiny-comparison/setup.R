@@ -703,7 +703,8 @@ plot_exception <-function(
 ## datatable helper
 
 list_funds <- function(data, filter = F, searching = F, fontsize = "100%",
-                       visible_cols = c("Name", "ISIN", "Symbol", "Issuer", "Trading currency", "Management fee", "Investment region")) {
+                       visible_cols = c("Name", "ISIN", "Symbol", "Issuer", "Trading currency", "Management fee", "Investment region"),
+                       selected = NULL) {
   
   if (filter) {
     filter <- "top"
@@ -717,8 +718,10 @@ list_funds <- function(data, filter = F, searching = F, fontsize = "100%",
                              columnDefs = list(list(targets = c(0, which(!(names(.) %in% visible_cols))), 
                                                     visible = F)),
                              buttons = c('colvis'), dom = 'Bfritp',
-                             search = list(search = 'CHF')), 
-              selection = "single", class = 'compact cell-border') %>%
+                             search = list(search = 'CHF'),
+                             displayStart = max(selected-10, 0)), 
+              selection = list(mode = "single", target = "row", selected = selected), #"single", 
+              class = 'compact cell-border') %>%
       formatString(suffix = "%", columns = "Management fee") %>% 
       formatStyle(columns = 1:37, fontSize = fontsize)
 }

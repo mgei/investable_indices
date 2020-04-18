@@ -24,7 +24,7 @@ ui <- fluidPage(
              status = "danger",
              individual = T,
              size = widget_size,
-             selected = fund_options_labels[2]
+             selected = NULL#fund_options_labels[2]
            ),
            div(style = "margin-top:-10px"),
            radioGroupButtons(
@@ -34,7 +34,7 @@ ui <- fluidPage(
              choices = c(fund_categories_labels, "Suche Volltext"),
              individual = T,
              size = widget_size,
-             selected = fund_categories_labels[2]),
+             selected = "Suche Volltext"), # fund_categories_labels[2]),
            div(style = "margin-top:-10px"),
            ),
     column(3,
@@ -86,10 +86,13 @@ ui <- fluidPage(
            )
            ),
     column(6,
-           plotOutput("main_plot")
-           # plotOutput("dividend_plot")
+           plotOutput("main_plot"),
+           plotOutput("dividend_payment_plot", height = "auto"),
+           plotOutput("dividend_yield_plot", height = "auto")
            ),
-    column(4, plotOutput("holdings_plot"))
+    column(4, plotOutput("holdings_plot"),
+           div(style = "margin-top:50px"),
+           plotOutput("drawdowns_plot", height = "auto"))
     ),
   ## 1.3. third row ----
   fluidRow(
@@ -98,8 +101,7 @@ ui <- fluidPage(
     column(7,
            dataTableOutput("performance_table")),
     column(3, 
-           div(style = "margin-top:50px"),
-           plotOutput("drawdowns_plot"))
+           )
   )),
   column(2,
          tableOutput("details_table"),
@@ -117,6 +119,25 @@ ui <- fluidPage(
   
 # 2. server ----
 server <- function(input, output, session) {
+  
+  ## 2.0.0. user post input ----
+  fundrow_selected <- NULL
+  
+  observe({
+    isolate({
+    query <- parseQueryString(session$clientData$url_search)
+    if (!is.null(query[['ISIN']]) & !is.null(query[['cur']])) {
+      user_ISIN <- query[['ISIN']]
+      user_cur <- query[['cur']]
+      
+      fundrow_selected <<- which(fundlist$ISIN == user_ISIN & fundlist$`Trading currency` == user_cur)
+    }
+    })
+  })
+  
+  # observeEvent(input$row, {
+  #   updateQueryString(input$txt, mode = "push")
+  # })
   
   # ## 2.0.1. fund list filtering ----
   fund_list_reactive <- reactive({
@@ -251,9 +272,13 @@ server <- function(input, output, session) {
   ## 2.0.2. data of the fund selected  ----
   fund_selected_reactive <- reactive({
     
-    if (!is.null(input$fund_list_dt_rows_selected)) {
+    input_selected_row <- input$fund_list_dt_rows_selected
+    
+    if (!is.null(input_selected_row)) {
       
-      f <- fund_list_reactive()[input$fund_list_dt_rows_selected, ]
+      f <- fund_list_reactive()[input_selected_row, ]
+      
+      updateQueryString(paste0("?ISIN=", f[["ISIN"]], "&cur=", f[["Trading currency"]]), mode = "push")
       
       details <- get_six_details_cache(f[["ISIN"]], 
                                        currency = f[["Trading currency"]])
@@ -309,17 +334,16 @@ server <- function(input, output, session) {
                DYield12 = Dividend12/Close,
                DYield24 = Dividend24*0.5/Close)
       
-      out <- list(ISIN = f[["ISIN"]],
-                  TradingCurrency = f[["Trading currency"]],
-                  Symbol = f[["Symbol"]],
-                  prices = prices,
-                  pricesCHF = pricesCHF,
-                  returnsCHF = returnsCHF,
-                  dividends = dividends,
-                  dividendsCHF = dividendsCHF,
-                  details = details,
-                  holdings = holdings)
-
+      out <- list(ISIN = f[["ISIN"]],                        # ok
+                  TradingCurrency = f[["Trading currency"]], # ok
+                  Symbol = f[["Symbol"]],                    # ok
+                  prices = prices,                           # ok
+                  pricesCHF = pricesCHF,                     # ok
+                  returnsCHF = returnsCHF,                   # ok
+                  dividends = dividends,                     # ok
+                  dividendsCHF = dividendsCHF,               # ok
+                  details = details,                         # ok
+                  holdings = holdings)                       # ok
     } else {
       out <- list()
     }
@@ -423,7 +447,7 @@ server <- function(input, output, session) {
   ## 2.1. list of funds ----
   output$fund_list_dt <- renderDataTable({
    fund_list_reactive() %>%
-     list_funds(fontsize = fontsize)
+     list_funds(fontsize = fontsize, selected = fundrow_selected)
    }, server = F)
   
   ## 2.1.a. list of funds fulltext search ----
@@ -441,10 +465,8 @@ server <- function(input, output, session) {
     }
   })
   
-  
   ## 2.2. main plot ----
   output$main_plot <- renderPlot({
-
     req(fund_selected_reactive())
     
     if (input$currency_chf) {
@@ -590,6 +612,97 @@ server <- function(input, output, session) {
       plot_exception("no data selected or found", type = "none")
     }
   })
+  
+  ## 2.2.a dividend plot ----
+  output$dividend_payment_plot <- renderPlot({
+    req(fund_selected_reactive())
+    
+    if (!is.null(fund_selected_reactive()$returnsCHF)) {
+      if (input$currency_chf) {
+        returnsCHF <- fund_selected_reactive()$returnsCHF %>% 
+          select(Date, Value) 
+        
+        if (input$plot_period == "akt. Jahr") {
+          returnsCHF <- returnsCHF %>% 
+            filter(Date >= floor_date(Sys.Date(), "year"))
+        } else if (input$plot_period == "12 Mte") {
+          returnsCHF <- returnsCHF %>% 
+            filter(Date >= (floor_date(Sys.Date(), "month") - months(12)))
+        } else if (input$plot_period == "2 Jahre") {
+          returnsCHF <- returnsCHF %>% 
+            filter(Date >= (floor_date(Sys.Date(), "month") - years(2)))
+        } else if (input$plot_period == "5 Jahre") {
+          returnsCHF <- returnsCHF %>% 
+            filter(Date >= (floor_date(Sys.Date(), "month") - years(5)))
+        } else if (input$plot_period == "max.") {
+          returnsCHF <- returnsCHF %>% 
+            filter(Date >= from_date_fund)
+        }
+          
+        returnsCHF %>% 
+          ggplot(aes(x = Date)) +
+          geom_point(aes(y = Value), color = "red", size = 2, alpha = 0.8) +
+          geom_text_repel(aes(y = Value, label = paste0("CHF ", round(Value, 2))), color = "red", size = 4) +
+          labs(x = "", y = "dividend (in CHF)") +
+          scale_x_date(breaks = function(x) seq.Date(from = min(x), to = max(x), length.out = 10),
+                       date_labels = "%d.%m.%y") +
+          scale_y_continuous(labels = number) +
+          theme_bw() +
+          theme(legend.position = c(0.7, 0.2),
+                legend.background = element_rect(linetype = 1, size = 0.2, color = "black"),
+                axis.text = element_text(size = 15), 
+                axis.title = element_text(size = 15),
+                legend.text = element_text(size = 15),
+                legend.title = element_text(size = 1))
+      }
+    }
+  }, height = 150L)
+  
+  ## 2.2.b dividend plot ----
+  output$dividend_yield_plot <- renderPlot({
+    req(fund_selected_reactive())
+    
+    if (!is.null(fund_selected_reactive()$returnsCHF)) {
+      if (input$currency_chf) {
+        returnsCHF <- fund_selected_reactive()$returnsCHF %>% 
+          select(Date, DYield12)
+          
+        if (input$plot_period == "akt. Jahr") {
+          returnsCHF <- returnsCHF %>% 
+            filter(Date >= floor_date(Sys.Date(), "year"))
+        } else if (input$plot_period == "12 Mte") {
+          returnsCHF <- returnsCHF %>% 
+            filter(Date >= (floor_date(Sys.Date(), "month") - months(12)))
+        } else if (input$plot_period == "2 Jahre") {
+          returnsCHF <- returnsCHF %>% 
+            filter(Date >= (floor_date(Sys.Date(), "month") - years(2)))
+        } else if (input$plot_period == "5 Jahre") {
+          returnsCHF <- returnsCHF %>% 
+            filter(Date >= (floor_date(Sys.Date(), "month") - years(5)))
+        } else if (input$plot_period == "max.") {
+          returnsCHF <- returnsCHF %>% 
+            filter(Date >= from_date_fund)
+        }
+        
+        returnsCHF %>% 
+          ggplot(aes(x = Date)) +
+          geom_line(aes(y = DYield12)) +
+          geom_smooth(aes(y = DYield12), size = 0.6) +
+          labs(x = "", y = "dividendyield (12mths)") +
+          scale_y_continuous(labels = percent) +
+          scale_x_date(breaks = function(x) seq.Date(from = min(x), to = max(x), length.out = 10),
+                       date_labels = "%d.%m.%y") +
+          theme_bw() +
+          theme(legend.position = c(0.7, 0.2),
+                legend.background = element_rect(linetype = 1, size = 0.2, color = "black"),
+                axis.text = element_text(size = 15), 
+                axis.title = element_text(size = 15),
+                legend.text = element_text(size = 15),
+                legend.title = element_text(size = 1))
+      }
+    }
+  }, height = 150L)
+  
   
   ## 2.3. holdings plot ----
   output$holdings_plot <- renderPlot({
@@ -810,6 +923,11 @@ server <- function(input, output, session) {
                      href = paste0("https://www.cash.ch/suche/alle/",
                                    fund_selected_reactive()$ISIN),
                      target="_blank")
+      
+      # current_view_link <- a("Cash.ch",
+      #                        href = paste0("https://www.cash.ch/suche/alle/",
+      #                                      fund_selected_reactive()$ISIN),
+      #                        target="_blank")
       
       tagList(strong("Direktlinks:"),
               br(),
