@@ -408,6 +408,31 @@ get_net_assets <- function(symbol) {
   out
 }
 
+get_net_assets_cache <- function(symbol,
+                                 reload_if_older_than = "1 week", cache_dir = "data/cache_netassets/") {
+  
+  if (paste0(symbol, ".RDS") %in% list.files(cache_dir)) {
+    cached <- readRDS(paste0(cache_dir, symbol, ".RDS"))
+    
+    if (cached$loaddate + period(reload_if_older_than) >= Sys.Date()) {
+      out <- cached$data
+      
+      return(out)
+    }
+  }
+  
+  # get from Yahoo
+  print("get net assets from Yahoo")
+  suppressWarnings(out <- get_net_assets(symbol))
+  
+  # save to cached files
+  list(loaddate = Sys.Date(),
+       data = out) %>% 
+    saveRDS(paste0(cache_dir, symbol, ".RDS"))
+  
+  return(out)
+}
+
 get_exchange_rate <- function(cur1, cur2, 
                               quandl_key = read_file("data/quandl.key")) {
   Quandl.api_key(quandl_key)
