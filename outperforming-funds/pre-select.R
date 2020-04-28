@@ -12,6 +12,11 @@ trading_since <- function(ISIN, currency, cache_dir = "../shiny-comparison/data/
   return(min(temp$data$Date))
 }
 
+has_dividend <- function(ISIN, currency, cache_dir = "../shiny-comparison/data/cache_dividends/") {
+  temp <- readRDS(paste0(cache_dir, ISIN, "_", currency, ".RDS"))
+  return(nrow(temp$data) > 0)
+}
+
 get_six_prices_cache_multi <- function(ISIN, currency, 
                                        col_name = NULL, col_currency = NULL,
                                        reload_if_older_than = "1 week", 
@@ -76,7 +81,7 @@ fundlist_since <- fundlist %>%
 
 fundlist_since %>% saveRDS("data/fundlist_since.RDS")
 
-fundlist_1 %>% 
+fundlist_since %>% 
   filter(since < (Sys.Date() - years(4))) %>% 
   group_by(`Asset class`, `Investment region`) %>% 
   count() %>% 
@@ -89,13 +94,19 @@ fundlist_1 %>%
   
 # Commodities 
 # Gold
-gold_selection <- fundlist_1 %>% 
+gold_selection <- fundlist_since %>% 
   filter(since < (Sys.Date() - years(4)),
          `Asset class` == "Commodities",
+         `Product type` == "Exchange Traded Funds",
          str_detect(Name, "Gold"),
          !str_detect(Name, "hedged|Hedged"),
          !(str_detect(Name, "Swisscanto") & `Trading currency` != "USD")) %>% 
   arrange(`Management fee`)
+
+for (i in 1:nrow(gold_selection)) {
+  print(get_six_dividends_cache(gold_selection$ISIN[i], gold_selection$`Trading currency`[i], cache_dir = "../shiny-comparison/data/cache_dividends/"))
+}
+
 
 p <- get_six_prices_cache_multi(gold_selection$ISIN, gold_selection$`Trading currency`, gold_selection$Name, gold_selection$`Trading currency`) %>% 
   # Die Anteile der oben erwähnten Anteilsklassen werden per 25. Oktober 2019 (nach Handelsschluss) im nachfolgenden Verhältnis aufgeteilt („Split“):
@@ -164,6 +175,56 @@ get_six_prices_cache_multi(gold_selection$ISIN, gold_selection$`Trading currency
   scale_x_continuous(breaks = 2005:2020) +
   coord_flip()
   
+gold_reg_data <- get_six_prices_cache_multi(gold_selection$ISIN, gold_selection$`Trading currency`, gold_selection$Name, gold_selection$`Trading currency`) %>% 
+  left_join(exchange_rates, by = c("Date", "Currency" = "from")) %>%
+  group_by(Name) %>% 
+  mutate(rate = na.locf(rate)) %>% 
+  ungroup() %>% 
+  mutate(CloseCHF = Close*rate,
+         VolumeCHF = TotalVolume*Close*rate) %>%
+  mutate(NameCur = interaction(Name, Currency)) %>% 
+  select(Date, NameCur, Currency, CloseCHF) %>% 
+  pivot_wider(names_from = "NameCur", values_from = "CloseCHF") %>% 
+  mutate_if(is.numeric, na.locf0) %>% 
+  janitor::clean_names()
+
+get_six_prices_cache_multi(gold_selection$ISIN, gold_selection$`Trading currency`, gold_selection$Name, gold_selection$`Trading currency`) %>% 
+  # Die Anteile der oben erwähnten Anteilsklassen werden per 25. Oktober 2019 (nach Handelsschluss) im nachfolgenden Verhältnis aufgeteilt („Split“):
+  # UBS ETF (CH) – Gold, (USD) A-dis: 1:3
+  # https://www.swissfunddata.ch/sfdpub/docs/a08-8172_02-20191022-de.pdf
+  mutate(Close = if_else(Name == "UBS ETF (CH) - Gold (USD) A-dis" & Date < dmy("28.10.2019"), Close/3, Close)) %>% 
+  left_join(exchange_rates, by = c("Date", "Currency" = "from")) %>%
+  group_by(Name) %>% 
+  mutate(rate = na.locf(rate)) %>% 
+  ungroup() %>% 
+  mutate(CloseCHF = Close*rate,
+         VolumeCHF = TotalVolume*Close*rate) %>%
+  mutate(NameCur = interaction(Name, Currency)) %>% 
+  group_by(Name, Currency) %>% 
+  mutate(Ra = CloseCHF/lag(CloseCHF)-1) %>% 
+  group_by(Name, Currency, year = year(Date)) %>%
+  filter(n() > 240 | year == 2020) %>% 
+  summarise(n = n(),
+            r = prod(1 + Ra, na.rm = T) - 1 ,
+            v = sd(Ra, na.rm = T)*sqrt(n())) %>% 
+  mutate(sr = r/v) %>% 
+  # filter(year == 2017) %>% 
+  arrange(desc(r)) %>% 
+  mutate(year = as.integer(year)) %>% 
+  select(Name, Currency, year, r) %>% 
+  pivot_wider(names_from = year, values_from = r) %>% 
+  select(Name, Currency, colnames(.) %>% sort()) %>% 
+  ungroup() %>% 
+  mutate(sum14_19 = (`2014` + `2015` + `2016` + `2017` + `2018` + `2019`)/6) %>% 
+  mutate_if(is.double, scales::percent_format(acccuracy = 0.01)) %>% 
+  arrange(desc(sum14_19))
+
+gold_official %>% 
+  group_by(year= year(Date)) %>% 
+  mutate(GoldCHF = na.locf0(GoldCHF)) %>% 
+  summarise(r = percent(last(GoldCHF)/first(GoldCHF)-1), accuracy = 0.01) %>% 
+  pivot_wider(names_from = year, values_from = r)
+
 get_six_prices_cache_multi(gold_selection$ISIN, gold_selection$`Trading currency`, gold_selection$Name, gold_selection$`Trading currency`) %>% 
   left_join(exchange_rates, by = c("Date", "Currency" = "from")) %>%
   group_by(Name) %>%
@@ -204,4 +265,172 @@ trading_since(fundlist$ISIN[1], fundlist$`Trading currency`[1])
   arrange(desc(Spread)) %>% 
   select(ISIN, Name, `Product type`, Spread)
 
+### other Commodities
+  
+fundlist_since %>% 
+  filter(since <= Sys.Date()- years(4),
+         `Asset class` == "Commodities",
+         !str_detect(Underlying, "gold|Gold"),
+         `Product type` == "Exchange Traded Funds",
+         !str_detect(Name, "hedged|Hedged"),
+         !str_detect(Underlying, "hedged|Hedged"),
+         !str_detect(Underlying, "platinum|palladium|silver"),
+         ) %>% 
+  datatable()
 
+
+fundlist_since %>% 
+  filter(since <= Sys.Date()- years(4),
+         `Product type` == "Exchange Traded Funds",
+         `Asset class` == "Equity Developed Markets",
+         !str_detect(Name, "hedged|Hedged"),
+         !str_detect(Underlying, "hedged|Hedged"),
+         `Investment region` == "Global",
+         str_detect(Name, "MSCI World")) %>% 
+  datatable(class = 'compact cell-border') %>% 
+  formatStyle(columns = 0:39, fontSize = "70%")
+
+## Global dev equity
+
+msciworld_selection <- fundlist_since %>% 
+  filter(`Asset class` == "Equity Developed Markets",
+         `Investment region` == "Global",
+         `Product type` == "Exchange Traded Funds",
+         str_detect(Underlying, "MSCI World"),
+         !str_detect(Name, "Hedged|hedged"),
+         since < (Sys.Date() - years(4)))
+
+msciworld_selection %>%  
+  datatable(class = 'compact cell-border') %>% 
+  formatStyle(columns = 0:39, fontSize = "70%")
+
+for (i in 1:nrow(msciworld_selection)) {
+  print(get_six_dividends_cache(msciworld_selection$ISIN[i], msciworld_selection$`Trading currency`[i], cache_dir = "../shiny-comparison/data/cache_dividends/"))
+}
+
+p <- get_six_prices_cache_multi(msciworld_selection$ISIN, msciworld_selection$`Trading currency`, msciworld_selection$Name, msciworld_selection$`Trading currency`) %>% 
+  # Die Anteile der oben erwähnten Anteilsklassen werden per 25. Oktober 2019 (nach Handelsschluss) im nachfolgenden Verhältnis aufgeteilt („Split“):
+  # UBS ETF (CH) – Gold, (USD) A-dis: 1:3
+  # https://www.swissfunddata.ch/sfdpub/docs/a08-8172_02-20191022-de.pdf
+  mutate(Close = if_else(Name == "UBS ETF (CH) - Gold (USD) A-dis" & Date < dmy("28.10.2019"), Close/3, Close)) %>% 
+  left_join(exchange_rates, by = c("Date", "Currency" = "from")) %>% 
+  mutate(CloseCHF = Close*rate) %>% 
+  filter(Date >= Sys.Date() - years(4)) %>% 
+  group_by(Name) %>% 
+  mutate(p = CloseCHF/CloseCHF[1L]) %>% 
+  ggplot(aes(x = Date, y = p, color = Name)) +
+  geom_line() +
+  theme(legend.position = "none")
+
+plotly::ggplotly(p)
+
+fundlist_since_prices <- fundlist_since %>% 
+  rowwise() %>% 
+  mutate(prices = list(get_six_prices_cache(ISIN = ISIN, currency = `Trading currency`, reload_if_older_than = "1 month", cache_dir = "../shiny-comparison/data/cache_six_prices/")))
+
+fundlist_since_prices %>% 
+  ungroup() %>% 
+  unnest()
+
+
+fundlist_since_prices_dividends <- fundlist_since_prices %>% 
+  rowwise() %>% 
+  mutate(dividends = list(get_six_dividends_cache(ISIN = ISIN, currency = `Trading currency`, 
+                                                  reload_if_older_than = "1 month", cache_dir = "../shiny-comparison/data/cache_dividends/"))) %>% 
+  ungroup()
+
+fundlist_since_prices_dividends %>% 
+  mutate(`D.` = map_lgl(dividends, ~(nrow(.x) > 0))) %>% 
+  select(Name, `D.`)
+
+
+tibble(x = 1:3, y = list(tibble(i = 1:3), tibble(i = 1:4), tibble(i = 3:4, p = 2)))
+
+create_list <- function(x) {
+  return(tibble(yo = x:(x+3)))
+}
+
+tibble(y = 1:4) %>% 
+  rowwise() %>% 
+  mutate(yolo = list(create_list(y))) %>% 
+  unnest()
+
+fundlist_since_prices <- fundlist_since_prices %>% 
+  ungroup()
+
+
+fundlist_since_prices %>% 
+  filter(`Asset class` == "Equity Developed Markets",
+         `Investment region` == "Global",
+         `Product type` == "Exchange Traded Funds",
+         str_detect(Underlying, "MSCI World"),
+         !str_detect(Name, "Hedged|hedged"),
+         since < (Sys.Date() - years(4))) %>% 
+  unnest(prices, names_repair = "universal") %>% 
+  group_by(ISIN...6, `Trading.currency`) %>% 
+  mutate(performance = Close/Close[1L] - 1) %>% 
+  ggplot(aes(x = Date, y = performance, color = Name)) +
+  geom_line() +
+  theme(legend.position = "bottom")
+
+fundlist_since_prices %>% 
+  filter(`Asset class` == "Equity Developed Markets",
+         `Investment region` == "Global",
+         `Product type` == "Exchange Traded Funds",
+         str_detect(Underlying, "MSCI World"),
+         !str_detect(Name, "Hedged|hedged"),
+         since < (Sys.Date() - years(4))) %>% 
+  select(Name, ISIN, `Trading currency`, `Management fee`, since)
+
+
+fundlist_since_prices_dividends %>% 
+  mutate(x = map(prices, ~Close*4))
+
+
+fundlist_since_prices_dividends %>% 
+  mutate(x = map(prices, paste))
+
+head(fundlist_since_prices_dividends) %>% 
+  select(Name, `Trading currency`, prices) %>% 
+  mutate(x = map(prices, function(x) x %>% 1))
+
+
+x <- head(fundlist_since, n = 2) %>% 
+  rowwise() %>% 
+  mutate(prices = list(get_six_prices_cache(ISIN = ISIN, currency = `Trading currency`, 
+                                            reload_if_older_than = "1 month", cache_dir = "../shiny-comparison/data/cache_six_prices/") %>% 
+                         mutate(cur = `Trading currency`))) %>% 
+  ungroup() %>% 
+  mutate(prices = map(prices, ~left_join(.x, exchange_rates %>% filter(to == "CHF"), by = c("cur" = "from", "Date" = "Date")))) %>% 
+  mutate(prices = map(prices, ~.x %>% mutate(rate = na.locf0(rate))))
+
+x$prices[[1]]
+
+x <- fundlist_since_prices_dividends %>% 
+  mutate(prices = map2(prices, `Trading currency`, ~.x %>% mutate(cur = .y)))
+
+x$prices[[4]]
+
+fundlist_since_prices_dividends %>% 
+  mut
+
+
+exchange_rates
+
+
+y <- tibble(qsec = head(as_tibble(mtcars))$qsec,
+            y = 1:6)
+
+
+
+head(as_tibble(mtcars)) %>% 
+  group_by(cyl) %>% 
+  nest() %>% 
+  mutate(data, map(data, .x %>% mutate(qsec = )))
+  mutate(data = map(data, ~left_join(.x, y, by = "qsec"))) %>% 
+  unnest()
+  
+  
+  
+  
+  

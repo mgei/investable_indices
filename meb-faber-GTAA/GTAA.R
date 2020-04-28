@@ -178,6 +178,7 @@ returns_years %>%
 
 returns %>% 
   select(Asset, ISIN, Date, Currency, Ra, Ra_rule) %>% 
+  rename(r = Ra, r_SMV_rule = Ra_rule) %>% 
   pivot_longer(cols = -c("Asset", "ISIN", "Currency", "Date")) %>%
   arrange(Asset, ISIN, Currency, name, Date) %>% 
   group_by(Asset, ISIN, Currency, name) %>% 
@@ -187,7 +188,8 @@ returns %>%
   geom_line() +
   labs(x = "") +
   facet_wrap(~Asset, scales = "free_y") +
-  theme(legend.position = c(0.8,0.05))
+  theme(legend.position = c(0.8,0.05),
+        strip.text.x = element_text(angle = 0, hjust = 0))
   
 
 
