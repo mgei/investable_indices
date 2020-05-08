@@ -233,14 +233,14 @@ get_six_dividends <- function(ISIN, currency = "CHF", category = "funds") {
   }
   
   url<-paste0("https://www.six-group.com/exchanges/", category, "/info_details_en.html?id=", ISIN, currency,"4&portalSegment=", category_short)
-  download.file(url, destfile = "scrapedpage.html", quiet=TRUE)
+  download.file(url, destfile = "data/scrapedpage.html", quiet=TRUE)
   
-  D1 <- read_html("scrapedpage.html") %>% 
+  D1 <- read_html("data/scrapedpage.html") %>% 
     html_nodes("table.table-grid") %>%
     html_nodes("td") %>%
     html_text()
   
-  unlink("scrapedpage.html")
+  # unlink("data/scrapedpage.html")
   df <- data.frame(matrix(unlist(D1), ncol=3, byrow=T), stringsAsFactors = F)
   colnames(df) <-c("Ex_dividend_date","Value","Currency")
   df <- df[-c(1, 2),]

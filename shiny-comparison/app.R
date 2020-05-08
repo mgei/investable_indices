@@ -622,6 +622,8 @@ server <- function(input, output, session) {
         returnsCHF <- fund_selected_reactive()$returnsCHF %>% 
           select(Date, Value) 
         
+        from_date_fund <- min(fund_selected_reactive()$prices$Date)
+        
         if (input$plot_period == "akt. Jahr") {
           returnsCHF <- returnsCHF %>% 
             filter(Date >= floor_date(Sys.Date(), "year"))
