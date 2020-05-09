@@ -91,8 +91,8 @@ get_yahoo_prices_cache <- function(symbol,
 }
 
 get_IB_etflist_cache <- function(exchange = "ARCA",
-                                  cache_dir = "data/cache_IB_etflist/",
-                                  reload_if_older_than = "1 month") {
+                                 cache_dir = "data/cache_IB_etflist/",
+                                 reload_if_older_than = "1 month") {
   
   if (!dir.exists(cache_dir)) {
     dir.create(cache_dir)
@@ -117,7 +117,8 @@ get_IB_etflist_cache <- function(exchange = "ARCA",
       html_table() %>% 
       .[[3]] %>% 
       as_tibble() %>% 
-      select(symbol = Symbol, description = 2, currency = Currency)
+      select(symbol = Symbol, description = 2, currency = Currency) %>% 
+      arrange(symbol)
   } else {
     print("error")
     out <- tibble()
