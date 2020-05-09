@@ -5,18 +5,31 @@ source("setup.R")
 # 1. UI ----
 ui <- fluidPage(
   tags$head(tags$style('.btn-group{ margin-top: 5px;}')),
-  fluidRow(tags$br()),
+  # fluidRow(div(style = "margin-top:10px")),
+  div(style = "margin-top:10px"),
+  fluidRow(
+    column(2,
+           sliderInput("daterange", "Calculation period (from-to)",
+                       min = Sys.Date() - years(30),
+                       max = Sys.Date(),
+                       value = c(Sys.Date() - years(10),
+                                 Sys.Date()),
+                       timeFormat="%Y-%m-%d")),
+    uiOutput("sliders")
+  ),
   fluidRow(
     column(2,
            actionGroupButtons(
              inputIds = c("reset_picker", "sample1_picker", "sample2_picker"),
              labels = list("reset", "SPY, BND, GLD", "VT, BND"),
              status = "primary"),
+           div(style = "margin-top:10px"),
            pickerInput(
              inputId = "etfs",
              label = "", 
              choices = NULL,
              multiple = T,
+             width = "75%",
              options = list(
                # size = 5,
                "live-search" = TRUE,
@@ -29,11 +42,7 @@ ui <- fluidPage(
                # `actions-box` = TRUE,
                "max-options" = 3,
                "max-options-text" = "select no more than 3!"
-             ))),
-    uiOutput("sliders")
-  ),
-  fluidRow(
-    column(2,
+             )),
            radioGroupButtons("rebalance_on",
                              "rebalance frequency:",
                              choices = c("daily", "weekly", "monthly", "quarterly", "annually", "never",
@@ -42,7 +51,7 @@ ui <- fluidPage(
                              individual = T,
                              status = "primary"),
            uiOutput("rebalance_deviation")),
-    uiOutput("etf_stats")
+    tableOutput("etf_stats")
   )
 )
 
@@ -76,7 +85,8 @@ server <- function(input, output, session) {
   ## 2.2. slider inputs ----
   
   observeEvent(input$etfs, {
-    subitems(paste0("slider_", input$etfs))
+    # subitems(paste0("slider_", input$etfs))
+    subitems(input$etfs)
   })
   
   output$sliders <- renderUI({
@@ -90,7 +100,7 @@ server <- function(input, output, session) {
     req(input$etfs)
     
     sum <- 0
-    for(s in subitems()) {
+    for(s in paste0("slider_", subitems())) {
       sum <- sum + input[[s]]
     }
     sum
@@ -100,11 +110,11 @@ server <- function(input, output, session) {
     lapply(
       subitems(),
       function(x) {
-        observeEvent(input[[x]], {
+        observeEvent(input[[paste0("slider_", x)]], {
           req(sum_of_sliders())
           
           if (sum_of_sliders() > 1) {
-            updateSliderInput(session, x, value = 1 - (sum_of_sliders() - input[[x]]))
+            updateSliderInput(session, x, value = 1 - (sum_of_sliders() - input[[paste0("slider_", x)]]))
           }
         })
       }
@@ -122,11 +132,53 @@ server <- function(input, output, session) {
   })
   
   ## 2.4. etf stats ----
+  price_return_data <- reactive({
+    req(input$etfs)
+    
+    get_yahoo_prices_cache(symbol = input$etfs, from = input$daterange[1], to = input$daterange[2]) %>% 
+      group_by(symbol) %>% 
+      mutate(ret = adjusted/lag(adjusted) - 1) %>% 
+      ungroup()
+  })
+  
+  observe({
+    mindate <- price_return_data() %>% 
+      group_by(symbol) %>% 
+      summarise(mindate = min(date)) %>% 
+      summarise(max(mindate)) %>% 
+      pull()
+    
+    updateSliderInput(session, "daterange", value = c(mindate, input$daterange[2]))
+  })
+  
   output$etf_stats <- renderUI({
     req(input$etfs)
     
     lapply(subitems(), 
-           function(x) { column(2, x) })
+           function(x) {
+             output[[paste0("stats_tbl_", x)]] <- renderTable({
+               price_return_data() %>% 
+                 filter(symbol == x) %>% 
+                 summarise(return = prod(1 + ret, na.rm = T)^(1/(n()/252)) - 1,
+                           volatility = sd(ret, na.rm = T)*sqrt(250),
+                           SR = return/volatility) %>% 
+                 mutate(return = percent(return),
+                        volatility = percent(volatility),
+                        SR = number(SR, accuracy = 0.01))
+             })
+             
+             output[[paste0("stats_gg_", x)]] <- renderPlot({
+               price_return_data() %>% 
+                 filter(symbol == x) %>% 
+                 ggplot(aes(x = date, y = adjusted)) +
+                 geom_line(color = "red") +
+                 theme_bw()
+             })
+             
+             column(2,
+                    tableOutput(paste0("stats_tbl_", x)),
+                    plotOutput(paste0("stats_gg_", x), height = "150px")
+                    ) })
   })
   
 }

@@ -1,6 +1,8 @@
 library(tidyverse)
 library(tidyquant)
 library(rvest)
+library(lubridate)
+library(scales)
 
 library(shiny)
 library(shinyWidgets)
