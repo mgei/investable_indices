@@ -7,6 +7,8 @@ library(scales)
 library(shiny)
 library(shinyWidgets)
 
+max_etfs <- 5
+
 get_yahoo_prices_cache <- function(symbol, 
                                    from = (floor_date(Sys.Date() - period(10, units = "years"), "month") - 1), 
                                    to = (floor_date(Sys.Date(), "month") - 1),

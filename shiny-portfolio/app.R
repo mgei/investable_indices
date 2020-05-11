@@ -29,7 +29,7 @@ ui <- fluidPage(
              label = "", 
              choices = NULL,
              multiple = T,
-             width = "75%",
+             width = "85%",
              options = list(
                # size = 5,
                "live-search" = TRUE,
@@ -40,8 +40,8 @@ ui <- fluidPage(
                "live-search-placeholder" = "type a ticker symbol",
                "none-selected-text" = "select your ETFs",
                # `actions-box` = TRUE,
-               "max-options" = 3,
-               "max-options-text" = "select no more than 3!"
+               "max-options" = max_etfs,
+               "max-options-text" = paste0("select no more than ", max_etfs, "!")
              )),
            radioGroupButtons("rebalance_on",
                              "rebalance frequency:",
@@ -52,6 +52,10 @@ ui <- fluidPage(
                              status = "primary"),
            uiOutput("rebalance_deviation")),
     tableOutput("etf_stats")
+  ),
+  hr(),
+  fluidRow(
+    
   )
 )
 
@@ -180,6 +184,11 @@ server <- function(input, output, session) {
                     plotOutput(paste0("stats_gg_", x), height = "150px")
                     ) })
   })
+  
+  ## 2.5. portfolio stats ----
+  pf_value_return_data <- reactive({
+    
+  }) 
   
 }
 
