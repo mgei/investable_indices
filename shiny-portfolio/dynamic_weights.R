@@ -1,3 +1,6 @@
+library(tidyverse)
+library(tidyquant)
+
 weights <- FANG %>% 
   select(symbol) %>% 
   distinct() %>% 
@@ -193,15 +196,38 @@ r %>%
          wC = vC/PF)
 
 
-compute_weights <- function(returns, weights = rep(1/ncol(returns), ncol(returns)), threshold = 0.05) {
+rets <- FANG %>% 
+  select(symbol, date, adjusted) %>% 
+  group_by(symbol) %>% 
+  mutate(ret = adjusted/lag(adjusted)-1) %>% 
+  select(-adjusted) %>% 
+  pivot_wider(names_from = "symbol", values_from = "ret")
 
-  # returns <- as.matrix(returns)
-  pf_weights <- matrix(weights, ncol = length(weights))
-  pf_values <- weights
-  pf_value <- rowSums(pf_values)
+returns <- rets
+
+tibble_as_matrix <- function(x, ...) {
+  x %>% 
+    column_to_rownames(...) %>% 
+    as.matrix()
+}
+
+compute_weights <- function(returns, weights = NULL, threshold = 0.05) {
+  
+  returns_matrix <- returns %>% 
+    tibble_as_matrix("date")
+  
+  if (is.null(weights)) {
+    pf_weights <- returns_matrix[1, , drop = FALSE] %>% 
+      replace_na(1)
+  }
+
+  pf_values <- pf_weights
+  pf_value <- pf_values %>% 
+    group_by(date) %>% 
+    transmute(value = rowSums(.[2:ncol(.)]))
   
   for (t in 1:nrow(returns)) {
-    pf_values <- pf_values %>% rbind((1 + returns[t,]) * pf_values[t,])
+    pf_values <- pf_values %>% bind_rows((1 + returns[t,2:ncol(returns)]) * pf_values[t,2:ncol(pf_values)])
     pf_value <- pf_value %>% rbind(sum(pf_values[t+1,]))
     pf_weights <- pf_weights %>% rbind(pf_values[t+1,]/pf_value[t+1])
   }
@@ -222,5 +248,83 @@ compute_weights <- function(returns, weights = rep(1/ncol(returns), ncol(returns
 }
 
 compute_weights(r %>% select(-period))
+
+
+m <- matrix(1:9, ncol = 3)
+rownames(m) <- c("a", "b", "c")
+m[1, ] # lost the row name
+m[1, , drop = FALSE] # got row name back and a matrix
+m[c(1,1), ] # the row name is back when result has nrow > 1
+
+returns_matrix[1, , drop = F]
+
+
+library(tidyverse)
+library(tidyquant)
+
+
+
+compute_weights <- weights
+
+symbols <- names(rets)[-1]
+
+for (i in 1:nrow(rets)) {
+  rets[1:i,] %>% 
+    mutate_at(vars(symbols), replace_na, 0) %>% 
+    mutate_at(vars(symbols), list(value = ~ (1+lag(.))))
+}
+
+rets %>% 
+  mutate_at(vars(symbols), replace_na, 0) %>% 
+  mutate_at(vars(symbols), list(cumprod = ~ cumprod(. + 1))) %>% 
+  mutate_at(vars(paste0(symbols, "_cumprod")), list(w = ~ ./sum(FB_cumprod + AMZN_cumprod + NFLX_cumprod + GOOG_cumprod)))
+
+rets %>% 
+  head() %>% 
+  mutate_at(vars(symbols), replace_na, 0) %>% 
+  group_by(date) %>% 
+  nest() %>% 
+  mutate(data_t = map())
+  
+  mutate_at(vars(symbols), list(x = ~ weightfun(.)))
+
+rets
+  
+weightfun <- function(x) {
+  print(x)
+  return(1)
+}
+
+
+for (i in 1:nrow(rets)) {
+  r <- rets[1:i,]
+  
+  if (i == 1) {
+    values <- r[1, ] %>% mutate_if(is.numeric, function(x) { 1 })
+  } else {
+    values <- values %>% bind_rows(values[(i-1) %>% mu, ])
+  }
+}
+
+rets <- 
+values
+weights
+
+
+mutate_at(vars(Revenue:Rent), list(percentage_of_rent = ~  ./Rent))
+
+# https://stackoverflow.com/questions/53288100/pass-function-arguments-by-column-position-to-mutate-at
+j <- 0
+rets %>% 
+  head() %>% 
+  mutate_at(vars(symbols), replace_na, 0) %>%
+  mutate_at(vars(symbols), list(v = ~ weights[j <<- j + 1] * cumprod(1 + .))) %>% 
+  mutate(pf = rowSums(select(., contains("_v")))) %>% 
+  mutate_at(vars(paste0(symbols, "_v")), list(x = ~ ./pf))
+
+weights <- c(0.05, 0.45, 0.25, 0.25)
+
+weights_tibble <- tibble(date = as.Date(NA), )
+
 
 
