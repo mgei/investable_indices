@@ -16,7 +16,15 @@ r_out <- tibble()
 i0 <- 1
 trade_rebalance <- 1
 pf_value <- 1
+rets <- rets %>% 
+  group_by(monat = floor_date(date, unit = "months")) %>% 
+  mutate(rebalance_day = date == max(date)) %>% 
+  ungroup() %>% 
+  select(-monat)
 for (i in 1:nrow(rets)) {
+  if (!rets[[i, "rebalance_day"]]) {
+    next()
+  }
   r <- rets[i0:i,]
   
   # https://stackoverflow.com/questions/53288100/pass-function-arguments-by-column-position-to-mutate-at
