@@ -6,6 +6,7 @@ library(scales)
 
 library(shiny)
 library(shinyWidgets)
+library(ggcorrplot)
 
 max_etfs <- 5
 
@@ -134,4 +135,14 @@ get_IB_etflist_cache <- function(exchange = "ARCA",
     saveRDS(paste0(cache_dir, exchange, ".RDS"))
   
   return(out)
+}
+
+calc_drawdown <- function(Ra) {
+  # same calculation formula as PerformanceAnalytics::Drawdowns geometric = FALSE
+  
+  p <- 1 + cumsum(Ra)
+  m <- cummax(c(1, p))[-1]
+  d <- p/m - 1
+  
+  return(d)
 }
