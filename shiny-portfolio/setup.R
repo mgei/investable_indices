@@ -6,13 +6,15 @@ library(scales)
 
 library(shiny)
 library(shinyWidgets)
+library(shinydashboard)
 
 library(ggcorrplot)
 library(ggrepel)
 library(shinycssloaders) #withSpinner(type = 3,color.background = "white")))
 library(ggfortify)
+library(plotly)
 
-max_etfs <- 5
+max_etfs <- 6
 
 get_yahoo_prices_cache <- function(symbol, 
                                    from = (floor_date(Sys.Date() - period(10, units = "years"), "month") - 1), 

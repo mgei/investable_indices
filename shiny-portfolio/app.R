@@ -6,12 +6,17 @@ source("setup.R")
 ui <- fluidPage(
   theme = "style.css",
   tags$head(tags$style('.btn-group{ margin-top: 5px;}')),
+  useShinydashboard(),
   # fluidRow(div(style = "margin-top:10px")),
   div(style = "margin-top:10px"),
   
   column(2,
          h3("ETF Portfolio Calculator"),
          hr(style="height:4px;background-color:#286090;margin-top:10px;"),
+         helpText("Please select up to 6 ETFs from the list below, or select a sample portfolio."),
+         helpText("Give it some time to load, as the data is fetched from Yahoo Finance and computed on-the-fly."),
+         helpText("The investment period is self-adjusting, allowing to select only the date range in which all selected ETFs have price data.",
+                  "The weights and the rebalance frequency has effect on the computed portfolio."),
          pickerInput(
            inputId = "etfs",
            label = "ETFs:", 
@@ -60,15 +65,17 @@ ui <- fluidPage(
                            selected = "months",
                            individual = T,
                            status = "primary",
-                           size = "xs")
-         ),
-  column(10,
+                           size = "xs"),
+         div(style = "margin-top:10px"),
+         tags$b("Portfolio optimization:"),
+         helpText("Optimization functionality will be coming soon.")
+  ),
+  column(8,
          fluidRow(
-           uiOutput("sliders") #%>% withSpinner(type = 1) #, proxy.height = "200px")
+           uiOutput("sliders") #, proxy.height = "200px")
          ),
          fluidRow(
-           uiOutput("etf_stats"),
-           uiOutput("correlations1")
+           uiOutput("etf_stats")
          ),
          fluidRow(
            hr()
@@ -77,7 +84,9 @@ ui <- fluidPage(
            uiOutput("pf_stats"),
            uiOutput("correlations2")
            )
-         )
+         ),
+  column(2,
+         uiOutput("correlations1"))
 )
 
 # 2. server ----
@@ -166,10 +175,15 @@ server <- function(input, output, session) {
   price_return_data <- reactive({
     req(input$etfs)
     
-    get_yahoo_prices_cache(symbol = input$etfs, from = input$daterange[1], to = input$daterange[2]) %>% 
+    x <- get_yahoo_prices_cache(symbol = input$etfs, from = input$daterange[1], to = input$daterange[2]) %>% 
       group_by(symbol) %>% 
       mutate(ret = adjusted/lag(adjusted) - 1) %>% 
       ungroup()
+    
+    x %>% saveRDS("d.RDS")
+    
+    x
+    
   })
   
   observe({
@@ -179,7 +193,13 @@ server <- function(input, output, session) {
       summarise(max(mindate)) %>% 
       pull()
     
-    updateSliderInput(session, "daterange", value = c(mindate, input$daterange[2]))
+    maxdate <- price_return_data() %>% 
+      group_by(symbol) %>% 
+      summarise(maxdate = max(date)) %>% 
+      summarise(min(maxdate)) %>% 
+      pull()
+    
+    updateSliderInput(session, "daterange", value = c(mindate, maxdate))
   })
   
   table_stats <- reactive({ 
@@ -218,7 +238,7 @@ server <- function(input, output, session) {
              })
              
              column(2,
-                    tableOutput(paste0("stats_tbl_", x)),
+                    tableOutput(paste0("stats_tbl_", x)), #%>% withSpinner(type = 1, proxy.height = "100px"),
                     plotOutput(paste0("stats_gg_", x), height = "150px")
                     ) 
              }
@@ -226,11 +246,16 @@ server <- function(input, output, session) {
   })
   
   output$correlations1 <- renderUI({
-    corr <- price_return_data() %>%
+    req(price_return_data())
+    
+    price_return_data_wide <- price_return_data() %>%
       select(symbol, date, ret) %>%
       filter(!is.na(ret)) %>%
       pivot_wider(names_from = "symbol", values_from = "ret") %>%
-      select(-date) %>%
+      filter(!is.na(rowSums(.[-1]))) %>% 
+      select(-date)
+    
+    corr <- price_return_data_wide %>% 
       cor()
 
     output[["corplot"]] <- renderPlot({
@@ -241,14 +266,33 @@ server <- function(input, output, session) {
                    ggtheme = ggplot2::theme_bw())
       }
     })
+    
+    pca <- price_return_data_wide %>%
+      prcomp(scale. = TRUE)
 
-    column(2,
-           plotOutput("corplot", height = "250px")
-    ) 
+    output[["pcaplot"]] <- renderPlot({
+      autoplot(pca, data = price_return_data_wide,
+               size = 0.2,
+               alpha = 0.2,
+               loadings = TRUE,
+               main = "PCA",
+               loadings.colour = "red",
+               loadings.label = TRUE,
+               loadings.label.size = 3,
+               loadings.label.repel = T) +
+        theme_bw()
+    })
+
+    column(12,
+           plotOutput("corplot", height = "250px"), # %>% withSpinner(type = 1, proxy.height = "200px"),
+           plotOutput("pcaplot", height = "200px")
+           )
   })
   
   ## 2.5. portfolio ----
   pf_weights <- reactive({
+    req(subitems())
+    
     w <- c()
     for(s in  paste0("slider_", subitems())) {
       w <- c(w, input[[s]])
@@ -269,6 +313,8 @@ server <- function(input, output, session) {
   })
   
   table_stats_pf <- reactive({
+    req(pf_value_return_data())
+    
     pf_value_return_data() %>%
       summarise(return_num = prod(1 + ret, na.rm = T)^(1/(n()/252)) - 1,
                 volatility_num = sd(ret, na.rm = T)*sqrt(250),
@@ -302,49 +348,58 @@ server <- function(input, output, session) {
              }
              )
     })
-
-    output[["stats_tbl_pf"]] <- renderTable({
-      table_stats_pf() %>% 
-        select(-symbol, -ends_with("_num"))
-    })
     
     output[["stats_gg_pf"]] <- renderPlot({
+      req(pf_value_return_data())
+      
       pf_value_return_data() %>%
         ggplot(aes(x = date, y = performance)) +
         geom_line(color = "#337ab7") +
         scale_x_date(date_labels = "%m.%Y") +
         scale_y_continuous(labels = percent) +
-        labs(x = "", y = "drawdown") +
+        labs(x = "", y = "Performance") +
         theme_bw()
       })
     
     output[["stats_gg_pf_dd"]] <- renderPlot({
+      req(pf_value_return_data())
+      
       pf_value_return_data() %>% 
           mutate(drawdown = calc_drawdown(ret)) %>% 
           ggplot(aes(x = date, y = drawdown)) +
           geom_line(color = "red") +
           scale_x_date(date_labels = "%m.%Y") +
           scale_y_continuous(labels = percent) +
-          labs(x = "", y = "drawdown") +
+          labs(x = "", y = "Drawdown") +
           theme_bw()
       })
     
     list(
       column(2,
              tags$b("Selected portfolio:"),
-             uiOutput("constitutes"),
-             hr(),
-             tableOutput("stats_tbl_pf")),
-      column(4,
-             plotOutput("stats_gg_pf", height = "300px"),
+             uiOutput("constitutes")),
+      column(6,
+             plotOutput("stats_gg_pf", height = "300px"),# %>% withSpinner(type = 1, proxy.height = "300px"),
              plotOutput("stats_gg_pf_dd", height = "200px")))
   })
   
 
   ## 2.6. correlations ----
   output$correlations2 <- renderUI({
+    req(table_stats())
+    req(table_stats_pf())
+    
+    output[["stats_tbl_pf"]] <- renderTable({
+      req(table_stats_pf())
+      
+      table_stats_pf() %>% 
+        select(-symbol, -ends_with("_num"))
+    })
     
     output[["returnsdplot"]] <- renderPlot({
+      req(table_stats())
+      req(table_stats_pf())
+      
       bind_rows(table_stats(), table_stats_pf()) %>% 
         ggplot(aes(x = volatility_num, y = return_num, color = symbol)) +
         geom_point(size = 3) +
@@ -358,7 +413,10 @@ server <- function(input, output, session) {
     
     column(4,
            # plotOutput("corplot", height = "300px", width = "300px"),
-           plotOutput("returnsdplot", height = "200px", width = "300px"))
+           tags$b("Portfolio"),
+           tableOutput("stats_tbl_pf"),
+           hr(),
+           plotOutput("returnsdplot", height = "200px"))
   })
   
 }
