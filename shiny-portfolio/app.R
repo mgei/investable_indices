@@ -4,71 +4,80 @@ source("setup.R")
 
 # 1. UI ----
 ui <- fluidPage(
+  theme = "style.css",
   tags$head(tags$style('.btn-group{ margin-top: 5px;}')),
   # fluidRow(div(style = "margin-top:10px")),
   div(style = "margin-top:10px"),
-  fluidRow(
-    column(2,
-           sliderInput("daterange", "Calculation period (from-to)",
-                       min = Sys.Date() - years(30),
-                       max = Sys.Date(),
-                       value = c(Sys.Date() - years(10),
-                                 Sys.Date()),
-                       timeFormat="%Y-%m-%d")),
-    uiOutput("sliders")
-  ),
-  fluidRow(
-    column(2,
-           tags$b("Sample portfolios:"),
-           br(),
-           actionLink("sample_allweather", "All Weather"),
-           br(),
-           actionLink("sample_vanguardtotal", "Vanguard Total World + Bond"),
-           br(),
-           actionLink("sample_USgoldbond", "S&P500 + Bond + Gold"),
-           br(),
-           actionLink("sample_USgoldbondemcom", "S&P500 + Bond + Gold + Emerging Mkt + Commodities"),
-           div(style = "margin-top:10px"),
-           pickerInput(
-             inputId = "etfs",
-             label = "", 
-             choices = NULL,
-             multiple = T,
-             width = "85%",
-             options = list(
-               # size = 5,
-               "live-search" = TRUE,
-               "live-search-style" = "startsWith",
-               size = 5.5,
-               # "virtual-scroll" = 10,
-               # "show-content" = F,
-               "live-search-placeholder" = "type a ticker symbol",
-               "none-selected-text" = "select your ETFs",
-               # `actions-box` = TRUE,
-               "max-options" = max_etfs,
-               "max-options-text" = paste0("select no more than ", max_etfs, "!")
-             )),
-           div(style = "margin-top:-10px"),
-           actionLink("reset", "reset selection"),
-           div(style = "margin-top:10px"),
-           radioGroupButtons("rebalance_on",
-                             "rebalance on:",
-                             choices = c("days", "weeks", "months", "quarters", "years"
-                                         # , "never", "when it deviates by more than ..."
-                                         ),
-                             selected = "months",
-                             individual = T,
-                             status = "primary"),
-           uiOutput("rebalance_deviation")),
-    uiOutput("etf_stats")
-  ),
-  hr(),
-  fluidRow(
-    uiOutput("pf_stats"),
-    uiOutput("correlations")
-    # tableOutput(paste0("stats_tbl_", "SPY"))
-    
-  )
+  
+  column(2,
+         h3("ETF Portfolio Calculator"),
+         hr(style="height:4px;background-color:#286090;margin-top:10px;"),
+         pickerInput(
+           inputId = "etfs",
+           label = "ETFs:", 
+           choices = NULL,
+           multiple = T,
+           width = "85%",
+           options = list(
+             # size = 5,
+             "live-search" = TRUE,
+             "live-search-style" = "startsWith",
+             size = 5.5,
+             # "virtual-scroll" = 10,
+             # "show-content" = F,
+             "live-search-placeholder" = "type a ticker symbol",
+             "none-selected-text" = "select your ETFs",
+             # `actions-box` = TRUE,
+             "max-options" = max_etfs,
+             "max-options-text" = paste0("select no more than ", max_etfs, "!")
+           )),
+         div(style = "margin-top:-10px"),
+         actionLink("reset_picker", "reset selection"),
+         # br(),
+         div(style = "margin-top:10px"),
+         tags$b("Sample portfolios:"),
+         br(),
+         actionLink("sample_allweather", "All Weather"),
+         br(),
+         actionLink("sample_vanguardtotal", "Vanguard Total World + Bond"),
+         br(),
+         actionLink("sample_USgoldbond", "S&P500 + Bond + Gold"),
+         br(),
+         actionLink("sample_USgoldbondemcom", "S&P500 + Bond + Gold + Emerging Mkt + Commodities"),
+         div(style = "margin-top:10px"),
+         sliderInput("daterange", "Investment period:",
+                     min = Sys.Date() - years(30),
+                     max = Sys.Date(),
+                     value = c(Sys.Date() - years(10),
+                               Sys.Date()),
+                     timeFormat="%Y-%m-%d"),
+         div(style = "margin-top:10px"),
+         radioGroupButtons("rebalance_on",
+                           "rebalance on:",
+                           choices = c("days", "weeks", "months", "quarters", "years"
+                                       # , "never", "when it deviates by more than ..."
+                           ),
+                           selected = "months",
+                           individual = T,
+                           status = "primary",
+                           size = "xs")
+         ),
+  column(10,
+         fluidRow(
+           uiOutput("sliders") #%>% withSpinner(type = 1) #, proxy.height = "200px")
+         ),
+         fluidRow(
+           uiOutput("etf_stats"),
+           uiOutput("correlations1")
+         ),
+         fluidRow(
+           hr()
+         ),
+         fluidRow(
+           uiOutput("pf_stats"),
+           uiOutput("correlations2")
+           )
+         )
 )
 
 # 2. server ----
@@ -152,13 +161,6 @@ server <- function(input, output, session) {
   
   ## 2.3. rebalance ----
   
-  output$rebalance_deviation <- renderUI({
-    req(input$rebalance_on)
-    
-    if (input$rebalance_on == "when it deviates by more than ...") {
-      numericInput("repalance_percent", label = "deviation in %-points", min = 0, max = 20, value = 5, step = 1, width = "30%")
-    }
-  })
   
   ## 2.4. etf stats ----
   price_return_data <- reactive({
@@ -223,6 +225,28 @@ server <- function(input, output, session) {
            )
   })
   
+  output$correlations1 <- renderUI({
+    corr <- price_return_data() %>%
+      select(symbol, date, ret) %>%
+      filter(!is.na(ret)) %>%
+      pivot_wider(names_from = "symbol", values_from = "ret") %>%
+      select(-date) %>%
+      cor()
+
+    output[["corplot"]] <- renderPlot({
+      if (length(subitems() > 1)) {
+        ggcorrplot(corr, hc.order = T,
+                   lab = TRUE, title = "Correlations",
+                   type = "lower", show.diag = T,
+                   ggtheme = ggplot2::theme_bw())
+      }
+    })
+
+    column(2,
+           plotOutput("corplot", height = "250px")
+    ) 
+  })
+  
   ## 2.5. portfolio ----
   pf_weights <- reactive({
     w <- c()
@@ -237,7 +261,6 @@ server <- function(input, output, session) {
     req(input$rebalance_on)
     
     if (length(pf_weights()) == length(subitems())) {
-      print(pf_weights())
       price_return_data() %>% 
         tq_portfolio(assets_col = symbol, returns_col = ret, weights = pf_weights(), rebalance_on = input$rebalance_on, 
                      col_rename = "ret") %>% 
@@ -253,11 +276,32 @@ server <- function(input, output, session) {
       mutate(return = percent(return_num),
              volatility = percent(volatility_num),
              SR = number(SR_num, accuracy = 0.01),
-             symbol = "_Portfolio")
+             symbol = "Portfolio")
   }) 
 
   output$pf_stats <- renderUI({
     req(pf_value_return_data())
+    
+    des_cur_tbl <- get_IB_etflist_cache() %>% 
+      filter(symbol %in% subitems()) %>% 
+      mutate(des_cur = paste0(description, " (", currency, ")"))
+    
+    des_cur_vct <- setNames(as.character(des_cur_tbl$des_cur), des_cur_tbl$symbol)
+    
+    output$constitutes <- renderUI({
+      lapply(subitems(), 
+             function(x) {
+               tagList(
+                 a(x, 
+                   href = paste0("https://finance.yahoo.com/quote/", x),
+                   target="_blank"),
+                 percent(input[[paste0("slider_", x)]]),
+                 p(des_cur_vct[x], id = "grayed")
+                 # br()
+                 )
+             }
+             )
+    })
 
     output[["stats_tbl_pf"]] <- renderTable({
       table_stats_pf() %>% 
@@ -287,6 +331,9 @@ server <- function(input, output, session) {
     
     list(
       column(2,
+             tags$b("Selected portfolio:"),
+             uiOutput("constitutes"),
+             hr(),
              tableOutput("stats_tbl_pf")),
       column(4,
              plotOutput("stats_gg_pf", height = "300px"),
@@ -295,30 +342,23 @@ server <- function(input, output, session) {
   
 
   ## 2.6. correlations ----
-  output$correlations <- renderUI({
-    corr <- price_return_data() %>%
-      select(symbol, date, ret) %>% 
-      filter(!is.na(ret)) %>% 
-      pivot_wider(names_from = "symbol", values_from = "ret") %>% 
-      select(-date) %>%
-      cor()
-    
-    output[["corplot"]] <- renderPlot({
-      ggcorrplot(corr, hc.order = T, type = "lower",
-               lab = TRUE, 
-               ggtheme = ggplot2::theme_bw())
-    })
+  output$correlations2 <- renderUI({
     
     output[["returnsdplot"]] <- renderPlot({
       bind_rows(table_stats(), table_stats_pf()) %>% 
         ggplot(aes(x = volatility_num, y = return_num, color = symbol)) +
-        geom_point() +
-        theme_bw()
+        geom_point(size = 3) +
+        geom_text_repel(aes(label = symbol)) +
+        scale_y_continuous(labels = percent) +
+        scale_x_continuous(labels = percent) +
+        labs(x = "Volatility", y = "Return") +
+        theme_bw() +
+        theme(legend.position = "none")
     })
     
     column(4,
-           plotOutput("corplot", height = "300px"),
-           plotOutput("returnsdplot", height = "200px"))
+           # plotOutput("corplot", height = "300px", width = "300px"),
+           plotOutput("returnsdplot", height = "200px", width = "300px"))
   })
   
 }

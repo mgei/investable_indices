@@ -6,7 +6,11 @@ library(scales)
 
 library(shiny)
 library(shinyWidgets)
+
 library(ggcorrplot)
+library(ggrepel)
+library(shinycssloaders) #withSpinner(type = 3,color.background = "white")))
+library(ggfortify)
 
 max_etfs <- 5
 

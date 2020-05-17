@@ -1,0 +1,15 @@
+#one {
+  font-family:Arial,sans-serif; 
+  font-size: 2em; 
+  color:blue;
+}
+
+#two {
+  background-color: blue;
+  border-radius: 5px;
+  color: yellow;
+}
+
+#grayed {
+  color: #636363;
+}
