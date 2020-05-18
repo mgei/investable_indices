@@ -51,14 +51,14 @@ ui <- fluidPage(
          actionLink("sample_USgoldbondemcom", "S&P500 + Bond + Gold + Emerging Mkt + Commodities"),
          div(style = "margin-top:10px"),
          sliderInput("daterange", "Investment period:",
-                     min = Sys.Date() - years(30),
+                     min = Sys.Date() - years(20),
                      max = Sys.Date(),
                      value = c(Sys.Date() - years(10),
                                Sys.Date()),
                      timeFormat="%Y-%m-%d"),
          div(style = "margin-top:10px"),
          radioGroupButtons("rebalance_on",
-                           "rebalance on:",
+                           "Rebalance on:",
                            choices = c("days", "weeks", "months", "quarters", "years"
                                        # , "never", "when it deviates by more than ..."
                            ),
@@ -229,17 +229,23 @@ server <- function(input, output, session) {
                  select(-symbol, -contains("_num"))
              })
              
-             output[[paste0("stats_gg_", x)]] <- renderPlot({
-               price_return_data() %>% 
+             output[[paste0("stats_gg_", x)]] <- renderPlotly({
+               p <- price_return_data() %>% 
                  filter(symbol == x) %>% 
-                 ggplot(aes(x = date, y = adjusted)) +
+                 mutate(performance = adjusted/adjusted[1L] - 1) %>% 
+                 ggplot(aes(x = date, y = performance)) +
                  geom_line(color = "red") +
+                 scale_y_continuous(labels = percent) +
+                 labs(x = "", y = "") +
                  theme_bw()
+               
+               ggplotly(p) %>% 
+                 config(displayModeBar = F)
              })
              
              column(2,
                     tableOutput(paste0("stats_tbl_", x)), #%>% withSpinner(type = 1, proxy.height = "100px"),
-                    plotOutput(paste0("stats_gg_", x), height = "150px")
+                    plotlyOutput(paste0("stats_gg_", x), height = "150px")
                     ) 
              }
            )
@@ -248,45 +254,53 @@ server <- function(input, output, session) {
   output$correlations1 <- renderUI({
     req(price_return_data())
     
-    price_return_data_wide <- price_return_data() %>%
-      select(symbol, date, ret) %>%
-      filter(!is.na(ret)) %>%
-      pivot_wider(names_from = "symbol", values_from = "ret") %>%
-      filter(!is.na(rowSums(.[-1]))) %>% 
-      select(-date)
+    if (length(subitems()) > 1) {
     
-    corr <- price_return_data_wide %>% 
-      cor()
-
-    output[["corplot"]] <- renderPlot({
-      if (length(subitems() > 1)) {
-        ggcorrplot(corr, hc.order = T,
+      price_return_data_wide <- price_return_data() %>%
+        select(symbol, date, ret) %>%
+        filter(!is.na(ret)) %>%
+        pivot_wider(names_from = "symbol", values_from = "ret") %>%
+        filter(!is.na(rowSums(.[-1]))) %>% 
+        select(-date)
+      
+      corr <- price_return_data_wide %>% 
+        cor()
+  
+      output[["corplot"]] <- renderPlotly({
+        p <- ggcorrplot(corr, hc.order = T,
                    lab = TRUE, title = "Correlations",
                    type = "lower", show.diag = T,
-                   ggtheme = ggplot2::theme_bw())
-      }
-    })
-    
-    pca <- price_return_data_wide %>%
-      prcomp(scale. = TRUE)
-
-    output[["pcaplot"]] <- renderPlot({
-      autoplot(pca, data = price_return_data_wide,
-               size = 0.2,
-               alpha = 0.2,
-               loadings = TRUE,
-               main = "PCA",
-               loadings.colour = "red",
-               loadings.label = TRUE,
-               loadings.label.size = 3,
-               loadings.label.repel = T) +
-        theme_bw()
-    })
-
-    column(12,
-           plotOutput("corplot", height = "250px"), # %>% withSpinner(type = 1, proxy.height = "200px"),
-           plotOutput("pcaplot", height = "200px")
-           )
+                   ggtheme = ggplot2::theme_bw(),
+                   show.legend = F)
+        
+        ggplotly(p) %>% 
+          config(displayModeBar = F)
+      })
+      
+      pca <- price_return_data_wide %>%
+        prcomp(scale. = TRUE)
+  
+      output[["pcaplot"]] <- renderPlotly({
+        p <- autoplot(pca, data = price_return_data_wide,
+                 size = 0.2,
+                 alpha = 0.2,
+                 loadings = TRUE,
+                 main = "PCA",
+                 loadings.colour = "red",
+                 loadings.label = TRUE,
+                 loadings.label.size = 3,
+                 loadings.label.repel = F) +
+          theme_bw()
+        
+        ggplotly(p) %>% 
+          config(displayModeBar = F)
+      })
+  
+      column(12,
+             plotlyOutput("corplot", height = "250px"), # %>% withSpinner(type = 1, proxy.height = "200px"),
+             plotlyOutput("pcaplot", height = "200px")
+             )
+    }
   })
   
   ## 2.5. portfolio ----
@@ -349,22 +363,25 @@ server <- function(input, output, session) {
              )
     })
     
-    output[["stats_gg_pf"]] <- renderPlot({
+    output[["stats_gg_pf"]] <- renderPlotly({
       req(pf_value_return_data())
       
-      pf_value_return_data() %>%
+      p <- pf_value_return_data() %>%
         ggplot(aes(x = date, y = performance)) +
         geom_line(color = "#337ab7") +
         scale_x_date(date_labels = "%m.%Y") +
         scale_y_continuous(labels = percent) +
         labs(x = "", y = "Performance") +
         theme_bw()
+      
+      ggplotly(p) %>% 
+        config(displayModeBar = F)
       })
     
-    output[["stats_gg_pf_dd"]] <- renderPlot({
+    output[["stats_gg_pf_dd"]] <- renderPlotly({
       req(pf_value_return_data())
       
-      pf_value_return_data() %>% 
+      p <- pf_value_return_data() %>% 
           mutate(drawdown = calc_drawdown(ret)) %>% 
           ggplot(aes(x = date, y = drawdown)) +
           geom_line(color = "red") +
@@ -372,6 +389,9 @@ server <- function(input, output, session) {
           scale_y_continuous(labels = percent) +
           labs(x = "", y = "Drawdown") +
           theme_bw()
+      
+      ggplotly(p) %>% 
+        config(displayModeBar = F)
       })
     
     list(
@@ -379,8 +399,8 @@ server <- function(input, output, session) {
              tags$b("Selected portfolio:"),
              uiOutput("constitutes")),
       column(6,
-             plotOutput("stats_gg_pf", height = "300px"),# %>% withSpinner(type = 1, proxy.height = "300px"),
-             plotOutput("stats_gg_pf_dd", height = "200px")))
+             plotlyOutput("stats_gg_pf", height = "300px"),# %>% withSpinner(type = 1, proxy.height = "300px"),
+             plotlyOutput("stats_gg_pf_dd", height = "200px")))
   })
   
 
@@ -396,19 +416,22 @@ server <- function(input, output, session) {
         select(-symbol, -ends_with("_num"))
     })
     
-    output[["returnsdplot"]] <- renderPlot({
+    output[["returnsdplot"]] <- renderPlotly({
       req(table_stats())
       req(table_stats_pf())
       
-      bind_rows(table_stats(), table_stats_pf()) %>% 
+      p <- bind_rows(table_stats(), table_stats_pf()) %>% 
         ggplot(aes(x = volatility_num, y = return_num, color = symbol)) +
-        geom_point(size = 3) +
-        geom_text_repel(aes(label = symbol)) +
+        geom_point(size = 2, alpha = 0.4) +
+        geom_text(aes(label = symbol), nudge_x = 0.01) +
         scale_y_continuous(labels = percent) +
         scale_x_continuous(labels = percent) +
         labs(x = "Volatility", y = "Return") +
         theme_bw() +
         theme(legend.position = "none")
+      
+      ggplotly(p) %>% 
+        config(displayModeBar = F)
     })
     
     column(4,
@@ -416,7 +439,7 @@ server <- function(input, output, session) {
            tags$b("Portfolio"),
            tableOutput("stats_tbl_pf"),
            hr(),
-           plotOutput("returnsdplot", height = "200px"))
+           plotlyOutput("returnsdplot", height = "200px"))
   })
   
 }
