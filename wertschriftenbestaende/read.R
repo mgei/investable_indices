@@ -227,3 +227,21 @@ data_cat_long_clean %>%
        subtitle = "SPI Index als gepunktete Linie",
        y = "Aktienbestand in Mrd. CHF", x = "",
        caption = "Daten: SNB, SIX, Grafik: Martin Geissmann")
+
+
+data_cat_long_clean %>%
+  filter(Wirtschaftssektor != "Alle Sektoren",
+         `Domizil des Depotinhabers` != "Inländische und ausländische Depotinhaber") %>% 
+  group_by(Wirtschaftssektor, `Domizil des Depotinhabers`) %>% 
+  count()
+
+
+data_cat_long_clean %>%
+  filter(Wirtschaftssektor != "Alle Sektoren",
+         `Domizil des Depotinhabers` != "Inländische und ausländische Depotinhaber") %>% 
+  filter(date == as.Date("2020-03-01")) %>% 
+  select(-symbol) %>% 
+  filter(Wertschriftenkategorie == "Total") %>% 
+  arrange(value) %>% 
+  select(-Wertschriftenkategorie)
+
