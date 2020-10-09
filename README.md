@@ -170,3 +170,9 @@ outdated: we found a better way to scrape including price data, see functions in
 WIP
 
 ![](./graphs/screenshot1.png)
+
+# Event study US presidential elections
+
+Performance of the S&P500 index around US presidential elections
+
+![](./graphs/USpresidential.png)
