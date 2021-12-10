@@ -448,7 +448,7 @@ server <- function(input, output, session) {
   output$fund_list_dt <- renderDataTable({
    fund_list_reactive() %>%
      list_funds(fontsize = fontsize, selected = fundrow_selected)
-   }, server = F)
+   })
   
   ## 2.1.a. list of funds fulltext search ----
   output$text_search <- renderUI({
